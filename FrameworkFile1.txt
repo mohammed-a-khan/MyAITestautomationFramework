@@ -1,0 +1,3156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.cssmart</groupId>
+    <artifactId>cssmart-framework</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>CSSmart Framework</name>
+    <description>Advanced Test Automation Framework with AI Capabilities</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <selenium.version>4.18.1</selenium.version>
+        <webdrivermanager.version>5.7.0</webdrivermanager.version>
+        <testng.version>7.9.0</testng.version>
+        <cucumber.version>7.15.0</cucumber.version>
+        <log4j.version>2.23.1</log4j.version>
+        <jackson.version>2.17.0</jackson.version>
+        <commons.io.version>2.15.1</commons.io.version>
+        <commons.lang3.version>3.14.0</commons.lang3.version>
+        <apache.poi.version>5.2.5</apache.poi.version>
+        <lombok.version>1.18.32</lombok.version>
+        <javassist.version>3.30.2-GA</javassist.version>
+        <mysql.connector.version>8.3.0</mysql.connector.version>
+        <reflections.version>0.10.2</reflections.version>
+        <hamcrest.version>2.2</hamcrest.version>
+        <java.net.http.version>1.0.0</java.net.http.version>
+    </properties>
+
+    <dependencies>
+        <!-- Selenium -->
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
+        
+        <!-- WebDriverManager -->
+        <dependency>
+            <groupId>io.github.bonigarcia</groupId>
+            <artifactId>webdrivermanager</artifactId>
+            <version>${webdrivermanager.version}</version>
+        </dependency>
+        
+        <!-- TestNG -->
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>${testng.version}</version>
+        </dependency>
+        
+        <!-- Cucumber -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <version>${cucumber.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-testng</artifactId>
+            <version>${cucumber.version}</version>
+        </dependency>
+        
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        
+        <!-- JSON Processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        
+        <!-- Apache Commons -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons.lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${commons.io.version}</version>
+        </dependency>
+        
+        <!-- Apache POI for Excel -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>${apache.poi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${apache.poi.version}</version>
+        </dependency>
+        
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <!-- Byte Code Manipulation for Annotation Processing -->
+        <dependency>
+            <groupId>org.javassist</groupId>
+            <artifactId>javassist</artifactId>
+            <version>${javassist.version}</version>
+        </dependency>
+        
+        <!-- Database Connectors -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.connector.version}</version>
+        </dependency>
+        
+        <!-- Class path scanning -->
+        <dependency>
+            <groupId>org.reflections</groupId>
+            <artifactId>reflections</artifactId>
+            <version>${reflections.version}</version>
+        </dependency>
+        
+        <!-- Assertion Library -->
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <version>${hamcrest.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.12.1</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                    <encoding>UTF-8</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <suiteXmlFiles>
+                        <suiteXmlFile>src/test/resources/testng.xml</suiteXmlFile>
+                    </suiteXmlFiles>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+
+src/main/resources/log4j2.xml
+-------------------------------------
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO">
+    <Properties>
+        <Property name="basePath">${sys:log.directory:-logs}</Property>
+    </Properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+        <RollingFile name="File" fileName="${basePath}/cssmart.log" filePattern="${basePath}/cssmart-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="${sys:log.level:-INFO}">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
+        </Root>
+    </Loggers>
+</Configuration>
+
+
+
+src/main/resources/cssmart.properties
+-----------------------------------------------
+
+# Browser Configuration
+browser=chrome
+headless=false
+driver.timeout.seconds=30
+driver.session.timeout.minutes=30
+
+# Test Execution
+parallel.threads=4
+retry.count=1
+
+# Reporting
+report.directory=cssmart-reports
+screenshot.directory=screenshots
+screenshot.onFailure=true
+log.directory=logs
+log.level=INFO
+
+# Database Configuration
+#database.type=mysql
+#database.host=localhost
+#database.port=3306
+#database.name=testdb
+#database.username=user
+#database.password=password
+
+# API Testing
+api.timeout=30
+#api.baseUrl=https://api.example.com
+
+# AI Testing Configuration
+ai.learning.directory=cssmart-ai-data
+ai.selfHealing=true
+ai.selfHealingThreshold=0.8
+visual.baseline.dir=visual-baseline
+visual.threshold=0.02
+generator.output.dir=generated-tests
+
+# Test Data
+data.directory=testdata
+
+
+
+src/main/java/com/cssmart/config/PropertyManager.java
+--------------------------------------------------------
+
+package com.cssmart.config;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+/**
+ * Manages property loading and resolution from multiple sources.
+ * Priority order (highest to lowest):
+ * 1. System properties
+ * 2. Environment variables
+ * 3. Custom property file
+ * 4. Default cssmart.properties
+ */
+public class PropertyManager {
+    private static final Logger LOGGER = LogManager.getLogger(PropertyManager.class);
+    private static final String DEFAULT_PROPERTIES_FILE = "cssmart.properties";
+    
+    private static final PropertyManager INSTANCE = new PropertyManager();
+    private final ConcurrentHashMap<String, String> propertyCache = new ConcurrentHashMap<>();
+    private final Properties defaultProperties = new Properties();
+    private Properties customProperties = null;
+    
+    private PropertyManager() {
+        loadDefaultProperties();
+    }
+    
+    public static PropertyManager getInstance() {
+        return INSTANCE;
+    }
+    
+    private void loadDefaultProperties() {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(DEFAULT_PROPERTIES_FILE)) {
+            if (is != null) {
+                defaultProperties.load(is);
+                LOGGER.info("Loaded default properties from {}", DEFAULT_PROPERTIES_FILE);
+            } else {
+                LOGGER.warn("Default properties file {} not found in classpath", DEFAULT_PROPERTIES_FILE);
+                createDefaultProperties();
+            }
+        } catch (IOException e) {
+            LOGGER.error("Error loading default properties", e);
+            createDefaultProperties();
+        }
+    }
+    
+    private void createDefaultProperties() {
+        // Set default values if properties file not found
+        defaultProperties.setProperty("browser", "chrome");
+        defaultProperties.setProperty("headless", "false");
+        defaultProperties.setProperty("driver.timeout.seconds", "30");
+        defaultProperties.setProperty("report.directory", "cssmart-reports");
+        defaultProperties.setProperty("screenshot.directory", "screenshots");
+        defaultProperties.setProperty("log.directory", "logs");
+        defaultProperties.setProperty("log.level", "INFO");
+        LOGGER.info("Created default properties");
+    }
+    
+    public void loadCustomProperties(String filePath) {
+        if (customProperties == null) {
+            customProperties = new Properties();
+        }
+        
+        Path path = Paths.get(filePath);
+        if (Files.exists(path)) {
+            try (InputStream is = Files.newInputStream(path)) {
+                customProperties.load(is);
+                LOGGER.info("Loaded custom properties from {}", filePath);
+                // Clear cache to reload properties
+                propertyCache.clear();
+            } catch (IOException e) {
+                LOGGER.error("Error loading custom properties from {}", filePath, e);
+            }
+        } else {
+            LOGGER.warn("Custom properties file {} not found", filePath);
+        }
+    }
+    
+    public String getProperty(String key) {
+        return getProperty(key, null);
+    }
+    
+    public String getProperty(String key, String defaultValue) {
+        // Check cache first for performance
+        String cachedValue = propertyCache.get(key);
+        if (cachedValue != null) {
+            return cachedValue;
+        }
+        
+        // Check sources in priority order
+        String value = System.getProperty(key);
+        
+        if (value == null) {
+            // Try environment variable - convert to uppercase with underscores
+            String envKey = key.toUpperCase().replace('.', '_');
+            value = System.getenv(envKey);
+        }
+        
+        if (value == null && customProperties != null) {
+            value = customProperties.getProperty(key);
+        }
+        
+        if (value == null) {
+            value = defaultProperties.getProperty(key, defaultValue);
+        }
+        
+        // Cache the result
+        if (value != null) {
+            propertyCache.put(key, value);
+        }
+        
+        return value;
+    }
+    
+    public int getIntProperty(String key, int defaultValue) {
+        String stringValue = getProperty(key);
+        if (stringValue != null) {
+            try {
+                return Integer.parseInt(stringValue);
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid integer value for property {}: {}", key, stringValue);
+            }
+        }
+        return defaultValue;
+    }
+    
+    public boolean getBooleanProperty(String key, boolean defaultValue) {
+        String stringValue = getProperty(key);
+        if (stringValue != null) {
+            return Boolean.parseBoolean(stringValue);
+        }
+        return defaultValue;
+    }
+    
+    public double getDoubleProperty(String key, double defaultValue) {
+        String stringValue = getProperty(key);
+        if (stringValue != null) {
+            try {
+                return Double.parseDouble(stringValue);
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid double value for property {}: {}", key, stringValue);
+            }
+        }
+        return defaultValue;
+    }
+    
+    public long getLongProperty(String key, long defaultValue) {
+        String stringValue = getProperty(key);
+        if (stringValue != null) {
+            try {
+                return Long.parseLong(stringValue);
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid long value for property {}: {}", key, stringValue);
+            }
+        }
+        return defaultValue;
+    }
+    
+    public void setProperty(String key, String value) {
+        // Update cache
+        propertyCache.put(key, value);
+        // Set as system property for this session
+        System.setProperty(key, value);
+    }
+    
+    public void clearCache() {
+        propertyCache.clear();
+    }
+}
+
+
+src/main/java/com/cssmart/config/CSSmartConfig.java
+-------------------------------------------------------
+
+package com.cssmart.config;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+
+/**
+ * High-level configuration interface for the CSSmart framework.
+ * Provides accessor methods for common configuration properties.
+ */
+public class CSSmartConfig {
+    private static final Logger LOGGER = LogManager.getLogger(CSSmartConfig.class);
+    private static final PropertyManager propertyManager = PropertyManager.getInstance();
+    
+    private CSSmartConfig() {
+        // Private constructor to prevent instantiation
+    }
+    
+    /**
+     * Initialize configuration with optional custom properties file
+     * 
+     * @param customPropertiesPath Path to custom properties file
+     */
+    public static void init(String customPropertiesPath) {
+        if (customPropertiesPath != null && !customPropertiesPath.isEmpty()) {
+            propertyManager.loadCustomProperties(customPropertiesPath);
+            LOGGER.info("Initialized CSSmart configuration with custom properties: {}", customPropertiesPath);
+        } else {
+            LOGGER.info("Initialized CSSmart configuration with default properties");
+        }
+    }
+    
+    /**
+     * Initialize configuration with default properties
+     */
+    public static void init() {
+        init(null);
+    }
+    
+    // Browser Configuration
+    
+    /**
+     * Get the configured browser type
+     * 
+     * @return Browser name (chrome, firefox, edge, etc.)
+     */
+    public static String getBrowser() {
+        return propertyManager.getProperty("browser", "chrome");
+    }
+    
+    /**
+     * Check if browser should run in headless mode
+     * 
+     * @return true if headless mode is enabled
+     */
+    public static boolean isHeadless() {
+        return propertyManager.getBooleanProperty("headless", false);
+    }
+    
+    /**
+     * Get the configured driver timeout in seconds
+     * 
+     * @return Driver timeout duration
+     */
+    public static Duration getDriverTimeout() {
+        int timeoutSeconds = propertyManager.getIntProperty("driver.timeout.seconds", 30);
+        return Duration.ofSeconds(timeoutSeconds);
+    }
+    
+    /**
+     * Get the configured driver session timeout in minutes
+     * 
+     * @return Driver session timeout duration
+     */
+    public static Duration getDriverSessionTimeout() {
+        int timeoutMinutes = propertyManager.getIntProperty("driver.session.timeout.minutes", 30);
+        return Duration.ofMinutes(timeoutMinutes);
+    }
+    
+    // Test Execution
+    
+    /**
+     * Get the configured number of parallel threads
+     * 
+     * @return Number of parallel threads
+     */
+    public static int getParallelThreads() {
+        return propertyManager.getIntProperty("parallel.threads", 4);
+    }
+    
+    /**
+     * Get the configured retry count for failed tests
+     * 
+     * @return Retry count
+     */
+    public static int getRetryCount() {
+        return propertyManager.getIntProperty("retry.count", 1);
+    }
+    
+    // Reporting
+    
+    /**
+     * Get the configured report directory
+     * 
+     * @return Path to report directory
+     */
+    public static Path getReportDirectory() {
+        String dir = propertyManager.getProperty("report.directory", "cssmart-reports");
+        return Paths.get(dir);
+    }
+    
+    /**
+     * Get the configured screenshot directory
+     * 
+     * @return Path to screenshot directory
+     */
+    public static Path getScreenshotDirectory() {
+        String baseDir = propertyManager.getProperty("report.directory", "cssmart-reports");
+        String screenshotDir = propertyManager.getProperty("screenshot.directory", "screenshots");
+        return Paths.get(baseDir, screenshotDir);
+    }
+    
+    /**
+     * Check if screenshots should be taken on test failure
+     * 
+     * @return true if screenshots on failure are enabled
+     */
+    public static boolean isScreenshotOnFailure() {
+        return propertyManager.getBooleanProperty("screenshot.onFailure", true);
+    }
+    
+    /**
+     * Get the configured log directory
+     * 
+     * @return Path to log directory
+     */
+    public static Path getLogDirectory() {
+        String dir = propertyManager.getProperty("log.directory", "logs");
+        return Paths.get(dir);
+    }
+    
+    /**
+     * Get the configured log level
+     * 
+     * @return Log level
+     */
+    public static String getLogLevel() {
+        return propertyManager.getProperty("log.level", "INFO");
+    }
+    
+    // Database Configuration
+    
+    /**
+     * Get the configured database type
+     * 
+     * @return Database type
+     */
+    public static String getDatabaseType() {
+        return propertyManager.getProperty("database.type", "mysql");
+    }
+    
+    /**
+     * Get the configured database host
+     * 
+     * @return Database host
+     */
+    public static String getDatabaseHost() {
+        return propertyManager.getProperty("database.host", "localhost");
+    }
+    
+    /**
+     * Get the configured database port
+     * 
+     * @return Database port
+     */
+    public static int getDatabasePort() {
+        return propertyManager.getIntProperty("database.port", 3306);
+    }
+    
+    /**
+     * Get the configured database name
+     * 
+     * @return Database name
+     */
+    public static String getDatabaseName() {
+        return propertyManager.getProperty("database.name", "testdb");
+    }
+    
+    /**
+     * Get the configured database username
+     * 
+     * @return Database username
+     */
+    public static String getDatabaseUsername() {
+        return propertyManager.getProperty("database.username", "");
+    }
+    
+    /**
+     * Get the configured database password
+     * 
+     * @return Database password
+     */
+    public static String getDatabasePassword() {
+        return propertyManager.getProperty("database.password", "");
+    }
+    
+    // API Testing
+    
+    /**
+     * Get the configured API timeout in seconds
+     * 
+     * @return API timeout duration
+     */
+    public static Duration getApiTimeout() {
+        int timeoutSeconds = propertyManager.getIntProperty("api.timeout", 30);
+        return Duration.ofSeconds(timeoutSeconds);
+    }
+    
+    /**
+     * Get the configured API base URL
+     * 
+     * @return API base URL
+     */
+    public static String getApiBaseUrl() {
+        return propertyManager.getProperty("api.baseUrl", "");
+    }
+    
+    // AI Testing Configuration
+    
+    /**
+     * Get the configured AI learning directory
+     * 
+     * @return Path to AI learning directory
+     */
+    public static Path getAiLearningDirectory() {
+        String dir = propertyManager.getProperty("ai.learning.directory", "cssmart-ai-data");
+        return Paths.get(dir);
+    }
+    
+    /**
+     * Check if self-healing is enabled
+     * 
+     * @return true if self-healing is enabled
+     */
+    public static boolean isSelfHealingEnabled() {
+        return propertyManager.getBooleanProperty("ai.selfHealing", true);
+    }
+    
+    /**
+     * Get the configured self-healing threshold
+     * 
+     * @return Self-healing threshold
+     */
+    public static double getSelfHealingThreshold() {
+        return propertyManager.getDoubleProperty("ai.selfHealingThreshold", 0.8);
+    }
+    
+    /**
+     * Get the configured visual baseline directory
+     * 
+     * @return Path to visual baseline directory
+     */
+    public static Path getVisualBaselineDirectory() {
+        String dir = propertyManager.getProperty("visual.baseline.dir", "visual-baseline");
+        return Paths.get(dir);
+    }
+    
+    /**
+     * Get the configured visual comparison threshold
+     * 
+     * @return Visual comparison threshold
+     */
+    public static double getVisualThreshold() {
+        return propertyManager.getDoubleProperty("visual.threshold", 0.02);
+    }
+    
+    /**
+     * Get the configured generator output directory
+     * 
+     * @return Path to generator output directory
+     */
+    public static Path getGeneratorOutputDirectory() {
+        String dir = propertyManager.getProperty("generator.output.dir", "generated-tests");
+        return Paths.get(dir);
+    }
+    
+    // Test Data
+    
+    /**
+     * Get the configured test data directory
+     * 
+     * @return Path to test data directory
+     */
+    public static Path getDataDirectory() {
+        String dir = propertyManager.getProperty("data.directory", "testdata");
+        return Paths.get(dir);
+    }
+    
+    /**
+     * Set a configuration property
+     * 
+     * @param key Property key
+     * @param value Property value
+     */
+    public static void setProperty(String key, String value) {
+        propertyManager.setProperty(key, value);
+        LOGGER.info("Set property: {}={}", key, value);
+    }
+}
+
+
+src/main/java/com/cssmart/utils/CSSmartLogger.java
+--------------------------------------------------------
+
+package com.cssmart.utils;
+
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Centralized logging system for the CSSmart framework.
+ * Provides thread-aware formatting and custom logging levels.
+ */
+public class CSSmartLogger {
+    private static final Map<String, Logger> LOGGERS = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Map<String, String>> THREAD_CONTEXT = ThreadLocal.withInitial(HashMap::new);
+    
+    private CSSmartLogger() {
+        // Private constructor to prevent instantiation
+    }
+    
+    /**
+     * Get a logger for the specified class
+     * 
+     * @param clazz Class to get logger for
+     * @return Logger instance
+     */
+    public static Logger getLogger(Class<?> clazz) {
+        return LOGGERS.computeIfAbsent(clazz.getName(), LogManager::getLogger);
+    }
+    
+    /**
+     * Get a logger with the specified name
+     * 
+     * @param name Logger name
+     * @return Logger instance
+     */
+    public static Logger getLogger(String name) {
+        return LOGGERS.computeIfAbsent(name, LogManager::getLogger);
+    }
+    
+    /**
+     * Set a context value for the current thread
+     * 
+     * @param key Context key
+     * @param value Context value
+     */
+    public static void setThreadContext(String key, String value) {
+        THREAD_CONTEXT.get().put(key, value);
+    }
+    
+    /**
+     * Get a context value for the current thread
+     * 
+     * @param key Context key
+     * @return Context value or null if not found
+     */
+    public static String getThreadContext(String key) {
+        return THREAD_CONTEXT.get().get(key);
+    }
+    
+    /**
+     * Remove a context value for the current thread
+     * 
+     * @param key Context key
+     */
+    public static void removeThreadContext(String key) {
+        THREAD_CONTEXT.get().remove(key);
+    }
+    
+    /**
+     * Clear all context values for the current thread
+     */
+    public static void clearThreadContext() {
+        THREAD_CONTEXT.get().clear();
+    }
+    
+    /**
+     * Set the log level for the specified logger
+     * 
+     * @param loggerName Logger name
+     * @param level Log level
+     */
+    public static void setLogLevel(String loggerName, Level level) {
+        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        Configuration config = ctx.getConfiguration();
+        LoggerConfig loggerConfig = config.getLoggerConfig(loggerName);
+        
+        // Create a new logger config if this is a new logger
+        if (!loggerName.equals(loggerConfig.getName())) {
+            loggerConfig = new LoggerConfig(loggerName, level, true);
+            config.addLogger(loggerName, loggerConfig);
+        } else {
+            loggerConfig.setLevel(level);
+        }
+        
+        ctx.updateLoggers();
+    }
+    
+    /**
+     * Set the root log level
+     * 
+     * @param level Log level
+     */
+    public static void setRootLogLevel(Level level) {
+        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        Configuration config = ctx.getConfiguration();
+        LoggerConfig loggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
+        loggerConfig.setLevel(level);
+        ctx.updateLoggers();
+    }
+    
+    /**
+     * Format a message with thread context values
+     * 
+     * @param message Original message
+     * @return Formatted message
+     */
+    public static String formatWithContext(String message) {
+        Map<String, String> context = THREAD_CONTEXT.get();
+        if (context.isEmpty()) {
+            return message;
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : context.entrySet()) {
+            if (!first) {
+                sb.append(", ");
+            }
+            sb.append(entry.getKey()).append("=").append(entry.getValue());
+            first = false;
+        }
+        sb.append("] ").append(message);
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Log a message with the specified level
+     * 
+     * @param logger Logger to use
+     * @param level Log level
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void log(Logger logger, Level level, String message, Object... args) {
+        String formattedMessage = formatWithContext(message);
+        logger.log(level, formattedMessage, args);
+    }
+    
+    /**
+     * Log a message with the INFO level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void info(Logger logger, String message, Object... args) {
+        log(logger, Level.INFO, message, args);
+    }
+    
+    /**
+     * Log a message with the DEBUG level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void debug(Logger logger, String message, Object... args) {
+        log(logger, Level.DEBUG, message, args);
+    }
+    
+    /**
+     * Log a message with the WARN level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void warn(Logger logger, String message, Object... args) {
+        log(logger, Level.WARN, message, args);
+    }
+    
+    /**
+     * Log a message with the ERROR level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void error(Logger logger, String message, Object... args) {
+        log(logger, Level.ERROR, message, args);
+    }
+    
+    /**
+     * Log a message with the TRACE level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param args Message arguments
+     */
+    public static void trace(Logger logger, String message, Object... args) {
+        log(logger, Level.TRACE, message, args);
+    }
+    
+    /**
+     * Log an exception
+     * 
+     * @param logger Logger to use
+     * @param level Log level
+     * @param message Message to log
+     * @param throwable Exception to log
+     */
+    public static void log(Logger logger, Level level, String message, Throwable throwable) {
+        String formattedMessage = formatWithContext(message);
+        logger.log(level, formattedMessage, throwable);
+    }
+    
+    /**
+     * Log an exception with the ERROR level
+     * 
+     * @param logger Logger to use
+     * @param message Message to log
+     * @param throwable Exception to log
+     */
+    public static void error(Logger logger, String message, Throwable throwable) {
+        log(logger, Level.ERROR, message, throwable);
+    }
+}
+
+
+
+src/main/java/com/cssmart/annotations/CSSmartFindBy.java
+-----------------------------------------------------------
+
+package com.cssmart.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Enhanced element locator annotation with multiple location strategies and fallback.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
+public @interface CSSmartFindBy {
+    
+    /**
+     * ID locator
+     */
+    String id() default "";
+    
+    /**
+     * Name locator
+     */
+    String name() default "";
+    
+    /**
+     * Class name locator
+     */
+    String className() default "";
+    
+    /**
+     * CSS selector locator
+     */
+    String css() default "";
+    
+    /**
+     * XPath locator
+     */
+    String xpath() default "";
+    
+    /**
+     * Tag name locator
+     */
+    String tagName() default "";
+    
+    /**
+     * Link text locator
+     */
+    String linkText() default "";
+    
+    /**
+     * Partial link text locator
+     */
+    String partialLinkText() default "";
+    
+    /**
+     * Accessibility ID locator (for mobile)
+     */
+    String accessibilityId() default "";
+    
+    /**
+     * AI locator (uses visual recognition)
+     */
+    String aiLocator() default "";
+    
+    /**
+     * Fallback locator description for self-healing
+     * (Natural language description of the element for AI recovery)
+     */
+    String description() default "";
+    
+    /**
+     * Locator order of priority
+     */
+    Priority[] priority() default {Priority.ID, Priority.NAME, Priority.CSS, Priority.XPATH, 
+                                      Priority.CLASS_NAME, Priority.TAG_NAME, Priority.LINK_TEXT, 
+                                      Priority.PARTIAL_LINK_TEXT, Priority.ACCESSIBILITY_ID, Priority.AI_LOCATOR};
+    
+    /**
+     * Wait timeout in seconds for this specific element
+     */
+    int timeoutSeconds() default -1;
+    
+    /**
+     * Whether to wait for element to be clickable instead of just visible
+     */
+    boolean waitForClickable() default false;
+    
+    /**
+     * Locator priority enum
+     */
+    enum Priority {
+        ID,
+        NAME,
+        CSS,
+        XPATH,
+        CLASS_NAME,
+        TAG_NAME,
+        LINK_TEXT,
+        PARTIAL_LINK_TEXT,
+        ACCESSIBILITY_ID,
+        AI_LOCATOR
+    }
+}
+
+src/main/java/com/cssmart/annotations/CSSmartTestStep.java
+--------------------------------------------------------------
+
+package com.cssmart.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Annotation for test steps used in reporting.
+ * Decorates test methods with descriptive steps.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD})
+public @interface CSSmartTestStep {
+    
+    /**
+     * Step description with placeholder support.
+     * Example: "Login as user {0} with password {1}"
+     */
+    String value();
+    
+    /**
+     * Whether to take screenshot after this step
+     */
+    boolean takeScreenshot() default false;
+    
+    /**
+     * Whether this is a critical step that should fail the test on error
+     */
+    boolean critical() default true;
+    
+    /**
+     * Group for related steps
+     */
+    String group() default "";
+    
+    /**
+     * Order of execution within a group
+     */
+    int order() default 0;
+    
+    /**
+     * Whether to include this step in reports
+     */
+    boolean reportable() default true;
+}
+
+
+src/main/java/com/cssmart/annotations/processors/CSSmartTestStepProcessor.java
+-----------------------------------------------------------------------------------
+
+package com.cssmart.annotations.processors;
+
+import com.cssmart.annotations.CSSmartTestStep;
+import com.cssmart.core.driver.CSSmartDriver;
+import com.cssmart.reporting.CSSmartReporter;
+import com.cssmart.utils.CSSmartLogger;
+import com.cssmart.utils.CSSmartScreenshot;
+import org.apache.logging.log4j.Logger;
+
+import java.lang.reflect.Method;
+import java.text.MessageFormat;
+
+/**
+ * Processor for the CSSmartTestStep annotation.
+ * Handles test step reporting and execution.
+ */
+public class CSSmartTestStepProcessor {
+    private static final Logger LOGGER = CSSmartLogger.getLogger(CSSmartTestStepProcessor.class);
+    
+    private CSSmartTestStepProcessor() {
+        // Private constructor to prevent instantiation
+    }
+    
+    /**
+     * Process a method with CSSmartTestStep annotation before execution
+     * 
+     * @param method The method to process
+     * @param args Method arguments
+     */
+    public static void beforeMethod(Method method, Object[] args) {
+        CSSmartTestStep annotation = method.getAnnotation(CSSmartTestStep.class);
+        if (annotation == null) {
+            return;
+        }
+        
+        String description = formatDescription(annotation.value(), args);
+        
+        LOGGER.info("STEP: {}", description);
+        
+        if (annotation.reportable()) {
+            CSSmartReporter.get().startStep(description, annotation.group(), annotation.order());
+        }
+    }
+    
+    /**
+     * Process a method with CSSmartTestStep annotation after execution
+     * 
+     * @param method The method to process
+     * @param args Method arguments
+     * @param result Method result
+     * @param throwable Exception thrown by method (null if successful)
+     */
+    public static void afterMethod(Method method, Object[] args, Object result, Throwable throwable) {
+        CSSmartTestStep annotation = method.getAnnotation(CSSmartTestStep.class);
+        if (annotation == null) {
+            return;
+        }
+        
+        String description = formatDescription(annotation.value(), args);
+        
+        if (throwable != null) {
+            LOGGER.error("STEP FAILED: {}", description, throwable);
+            
+            if (annotation.reportable()) {
+                CSSmartReporter.get().failStep(description, throwable);
+            }
+            
+            // Take screenshot on failure
+            takeScreenshot(description + " (Failed)", true);
+            
+            // Re-throw if critical
+            if (annotation.critical()) {
+                if (throwable instanceof RuntimeException) {
+                    throw (RuntimeException) throwable;
+                } else {
+                    throw new RuntimeException("Critical step failed: " + description, throwable);
+                }
+            }
+        } else {
+            LOGGER.info("STEP COMPLETED: {}", description);
+            
+            if (annotation.reportable()) {
+                CSSmartReporter.get().passStep(description);
+            }
+            
+            // Take screenshot if configured
+            if (annotation.takeScreenshot()) {
+                takeScreenshot(description, false);
+            }
+        }
+    }
+    
+    /**
+     * Format the step description with arguments
+     * 
+     * @param pattern Description pattern
+     * @param args Method arguments
+     * @return Formatted description
+     */
+    private static String formatDescription(String pattern, Object[] args) {
+        if (args == null || args.length == 0) {
+            return pattern;
+        }
+        
+        try {
+            return MessageFormat.format(pattern, args);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to format step description: {}", pattern, e);
+            return pattern;
+        }
+    }
+    
+    /**
+     * Take a screenshot of the current page
+     * 
+     * @param description Screenshot description
+     * @param isFailure Whether this is a failure screenshot
+     */
+    private static void takeScreenshot(String description, boolean isFailure) {
+        try {
+            if (CSSmartDriver.hasActiveDriver()) {
+                String screenshotPath = CSSmartScreenshot.takeScreenshot(
+                        CSSmartDriver.getDriver(), 
+                        description.replaceAll("[^a-zA-Z0-9.-]", "_"),
+                        isFailure);
+                
+                if (screenshotPath != null) {
+                    CSSmartReporter.get().addScreenshot(description, screenshotPath, isFailure);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot for step: {}", description, e);
+        }
+    }
+}
+
+
+
+
+src/main/java/com/cssmart/core/driver/CSSmartDriver.java
+--------------------------------------------------------------
+
+
+package com.cssmart.core.driver;
+
+import com.cssmart.core.config.CSSmartConfig;
+import com.cssmart.core.logging.CSSmartLogger;
+import com.cssmart.core.util.WaitUtils;
+import org.openqa.selenium.*;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Thread-safe WebDriver wrapper with enhanced driving capabilities.
+ * Provides centralized driver management with advanced navigation,
+ * interaction, and synchronization features.
+ */
+public class CSSmartDriver {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartDriver.class);
+    private static final ThreadLocal<WebDriver> DRIVER_THREAD_LOCAL = new ThreadLocal<>();
+    private static final Map<Long, WebDriver> ALL_DRIVERS = new ConcurrentHashMap<>();
+    
+    private final CSSmartConfig config;
+    private final Duration defaultTimeout;
+    private final Duration pollingInterval;
+    
+    /**
+     * Constructs a new CSSmartDriver with the specified configuration.
+     * 
+     * @param config The framework configuration
+     */
+    public CSSmartDriver(CSSmartConfig config) {
+        this.config = config;
+        this.defaultTimeout = Duration.ofSeconds(config.getLong("driver.timeout.default", 30));
+        this.pollingInterval = Duration.ofMillis(config.getLong("driver.polling.interval", 500));
+    }
+    
+    /**
+     * Gets the current WebDriver instance for this thread or creates a new one if none exists.
+     * 
+     * @return The WebDriver instance for the current thread
+     */
+    public WebDriver getDriver() {
+        WebDriver driver = DRIVER_THREAD_LOCAL.get();
+        if (driver == null) {
+            LOGGER.info("No WebDriver found for current thread. Initializing new driver.");
+            driver = initializeDriver();
+            DRIVER_THREAD_LOCAL.set(driver);
+            ALL_DRIVERS.put(Thread.currentThread().getId(), driver);
+        }
+        return driver;
+    }
+    
+    /**
+     * Initializes a new WebDriver based on configuration.
+     * This method should be extended to support different browser types.
+     * 
+     * @return A new WebDriver instance
+     */
+    protected WebDriver initializeDriver() {
+        // This will be implemented by specific browser driver classes
+        // For now, we'll throw an exception as this is meant to be extended
+        throw new UnsupportedOperationException(
+            "CSSmartDriver is an abstract driver manager. Please use a specific browser driver implementation.");
+    }
+    
+    /**
+     * Navigates to the specified URL with logging and error handling.
+     * 
+     * @param url The URL to navigate to
+     */
+    public void navigateTo(String url) {
+        LOGGER.info("Navigating to: {}", url);
+        try {
+            getDriver().get(url);
+            LOGGER.debug("Successfully navigated to: {}", url);
+        } catch (WebDriverException e) {
+            LOGGER.error("Failed to navigate to URL: {}", url, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Finds an element with wait and logging.
+     * 
+     * @param by The locator to find the element
+     * @return The found WebElement
+     * @throws TimeoutException if element is not found within the timeout period
+     */
+    public WebElement findElement(By by) {
+        return findElement(by, defaultTimeout);
+    }
+    
+    /**
+     * Finds an element with a custom timeout.
+     * 
+     * @param by The locator to find the element
+     * @param timeout The timeout duration
+     * @return The found WebElement
+     * @throws TimeoutException if element is not found within the timeout period
+     */
+    public WebElement findElement(By by, Duration timeout) {
+        LOGGER.debug("Finding element: {}", by);
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), timeout, pollingInterval);
+            return wait.until(ExpectedConditions.presenceOfElementLocated(by));
+        } catch (TimeoutException e) {
+            LOGGER.error("Element not found within timeout: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Finds all elements matching the locator.
+     * 
+     * @param by The locator to find elements
+     * @return List of found WebElements
+     */
+    public List<WebElement> findElements(By by) {
+        return findElements(by, defaultTimeout);
+    }
+    
+    /**
+     * Finds all elements matching the locator with custom timeout.
+     * 
+     * @param by The locator to find elements
+     * @param timeout The timeout duration
+     * @return List of found WebElements
+     */
+    public List<WebElement> findElements(By by, Duration timeout) {
+        LOGGER.debug("Finding elements: {}", by);
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), timeout, pollingInterval);
+            return wait.until(driver -> {
+                List<WebElement> elements = driver.findElements(by);
+                return elements.isEmpty() ? null : elements;
+            });
+        } catch (TimeoutException e) {
+            LOGGER.debug("No elements found within timeout: {}", by);
+            return List.of();
+        }
+    }
+    
+    /**
+     * Checks if an element exists on the page.
+     * 
+     * @param by The locator to check
+     * @return true if element exists, false otherwise
+     */
+    public boolean elementExists(By by) {
+        return elementExists(by, Duration.ofSeconds(5));
+    }
+    
+    /**
+     * Checks if an element exists on the page with custom timeout.
+     * 
+     * @param by The locator to check
+     * @param timeout The timeout duration
+     * @return true if element exists, false otherwise
+     */
+    public boolean elementExists(By by, Duration timeout) {
+        try {
+            findElement(by, timeout);
+            return true;
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Waits for an element to be clickable then clicks it.
+     * 
+     * @param by The locator of the element to click
+     */
+    public void click(By by) {
+        click(by, defaultTimeout);
+    }
+    
+    /**
+     * Waits for an element to be clickable then clicks it with custom timeout.
+     * 
+     * @param by The locator of the element to click
+     * @param timeout The timeout duration
+     */
+    public void click(By by, Duration timeout) {
+        LOGGER.debug("Clicking on element: {}", by);
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), timeout, pollingInterval);
+            WebElement element = wait.until(ExpectedConditions.elementToBeClickable(by));
+            element.click();
+            LOGGER.debug("Clicked element: {}", by);
+        } catch (Exception e) {
+            LOGGER.error("Failed to click element: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Performs JavaScript click on an element when standard click might not work.
+     * 
+     * @param by The locator of the element to click
+     */
+    public void jsClick(By by) {
+        LOGGER.debug("Performing JavaScript click on element: {}", by);
+        try {
+            WebElement element = findElement(by);
+            JavascriptExecutor js = (JavascriptExecutor) getDriver();
+            js.executeScript("arguments[0].click();", element);
+            LOGGER.debug("Performed JavaScript click on element: {}", by);
+        } catch (Exception e) {
+            LOGGER.error("Failed to perform JavaScript click on element: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Types text into an input element after clearing its existing value.
+     * 
+     * @param by The locator of the input element
+     * @param text The text to type
+     */
+    public void sendKeys(By by, String text) {
+        sendKeys(by, text, true);
+    }
+    
+    /**
+     * Types text into an input element with option to clear first.
+     * 
+     * @param by The locator of the input element
+     * @param text The text to type
+     * @param clearFirst Whether to clear the field first
+     */
+    public void sendKeys(By by, String text, boolean clearFirst) {
+        LOGGER.debug("Sending keys to element: {} text: {}", by, text);
+        try {
+            WebElement element = findElement(by);
+            if (clearFirst) {
+                element.clear();
+            }
+            element.sendKeys(text);
+            LOGGER.debug("Sent keys to element: {}", by);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send keys to element: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Selects an option from dropdown by visible text.
+     * 
+     * @param by The locator of the select element
+     * @param visibleText The visible text of the option to select
+     */
+    public void selectByVisibleText(By by, String visibleText) {
+        LOGGER.debug("Selecting option with text '{}' from dropdown: {}", visibleText, by);
+        try {
+            WebElement element = findElement(by);
+            org.openqa.selenium.support.ui.Select select = 
+                new org.openqa.selenium.support.ui.Select(element);
+            select.selectByVisibleText(visibleText);
+            LOGGER.debug("Selected option with text: {}", visibleText);
+        } catch (Exception e) {
+            LOGGER.error("Failed to select option with text '{}' from dropdown: {}", 
+                visibleText, by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets text from an element.
+     * 
+     * @param by The locator of the element
+     * @return The text content of the element
+     */
+    public String getText(By by) {
+        LOGGER.debug("Getting text from element: {}", by);
+        try {
+            WebElement element = findElement(by);
+            String text = element.getText();
+            LOGGER.debug("Got text from element: {} text: {}", by, text);
+            return text;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get text from element: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets attribute value from an element.
+     * 
+     * @param by The locator of the element
+     * @param attributeName The name of the attribute
+     * @return The value of the attribute
+     */
+    public String getAttribute(By by, String attributeName) {
+        LOGGER.debug("Getting attribute '{}' from element: {}", attributeName, by);
+        try {
+            WebElement element = findElement(by);
+            String value = element.getAttribute(attributeName);
+            LOGGER.debug("Got attribute '{}' from element: {} value: {}", 
+                attributeName, by, value);
+            return value;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get attribute '{}' from element: {}", 
+                attributeName, by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Hovers over an element.
+     * 
+     * @param by The locator of the element to hover over
+     */
+    public void hover(By by) {
+        LOGGER.debug("Hovering over element: {}", by);
+        try {
+            WebElement element = findElement(by);
+            Actions actions = new Actions(getDriver());
+            actions.moveToElement(element).perform();
+            LOGGER.debug("Hovered over element: {}", by);
+        } catch (Exception e) {
+            LOGGER.error("Failed to hover over element: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Executes JavaScript code.
+     * 
+     * @param script The JavaScript code to execute
+     * @param args The arguments to pass to the script
+     * @return The result of script execution
+     */
+    public Object executeScript(String script, Object... args) {
+        LOGGER.debug("Executing JavaScript: {}", script);
+        try {
+            JavascriptExecutor js = (JavascriptExecutor) getDriver();
+            Object result = js.executeScript(script, args);
+            LOGGER.debug("Executed JavaScript successfully");
+            return result;
+        } catch (Exception e) {
+            LOGGER.error("Failed to execute JavaScript: {}", script, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Takes a screenshot and returns it as bytes.
+     * 
+     * @return The screenshot as byte array
+     */
+    public byte[] takeScreenshot() {
+        LOGGER.debug("Taking screenshot");
+        try {
+            TakesScreenshot screenshotDriver = (TakesScreenshot) getDriver();
+            byte[] screenshot = screenshotDriver.getScreenshotAs(OutputType.BYTES);
+            LOGGER.debug("Screenshot taken successfully");
+            return screenshot;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Refreshes the current page.
+     */
+    public void refresh() {
+        LOGGER.debug("Refreshing page");
+        try {
+            getDriver().navigate().refresh();
+            LOGGER.debug("Page refreshed successfully");
+        } catch (Exception e) {
+            LOGGER.error("Failed to refresh page", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Navigates back in browser history.
+     */
+    public void back() {
+        LOGGER.debug("Navigating back");
+        try {
+            getDriver().navigate().back();
+            LOGGER.debug("Navigated back successfully");
+        } catch (Exception e) {
+            LOGGER.error("Failed to navigate back", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Navigates forward in browser history.
+     */
+    public void forward() {
+        LOGGER.debug("Navigating forward");
+        try {
+            getDriver().navigate().forward();
+            LOGGER.debug("Navigated forward successfully");
+        } catch (Exception e) {
+            LOGGER.error("Failed to navigate forward", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the current URL.
+     * 
+     * @return The current URL
+     */
+    public String getCurrentUrl() {
+        LOGGER.debug("Getting current URL");
+        return getDriver().getCurrentUrl();
+    }
+    
+    /**
+     * Gets the page title.
+     * 
+     * @return The page title
+     */
+    public String getTitle() {
+        LOGGER.debug("Getting page title");
+        return getDriver().getTitle();
+    }
+    
+    /**
+     * Waits for page to load completely.
+     */
+    public void waitForPageLoad() {
+        LOGGER.debug("Waiting for page to load");
+        try {
+            WaitUtils.waitForCondition(
+                driver -> executeScript("return document.readyState").equals("complete"),
+                defaultTimeout,
+                "Page did not load completely"
+            );
+            LOGGER.debug("Page loaded successfully");
+        } catch (Exception e) {
+            LOGGER.error("Page load wait timed out", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Switches to a frame by locator.
+     * 
+     * @param by The locator of the frame
+     */
+    public void switchToFrame(By by) {
+        LOGGER.debug("Switching to frame: {}", by);
+        try {
+            WebElement frameElement = findElement(by);
+            getDriver().switchTo().frame(frameElement);
+            LOGGER.debug("Switched to frame: {}", by);
+        } catch (Exception e) {
+            LOGGER.error("Failed to switch to frame: {}", by, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Switches back to the main document from a frame.
+     */
+    public void switchToDefaultContent() {
+        LOGGER.debug("Switching to default content");
+        try {
+            getDriver().switchTo().defaultContent();
+            LOGGER.debug("Switched to default content");
+        } catch (Exception e) {
+            LOGGER.error("Failed to switch to default content", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Switches to a window/tab by its handle.
+     * 
+     * @param windowHandle The window handle to switch to
+     */
+    public void switchToWindow(String windowHandle) {
+        LOGGER.debug("Switching to window: {}", windowHandle);
+        try {
+            getDriver().switchTo().window(windowHandle);
+            LOGGER.debug("Switched to window: {}", windowHandle);
+        } catch (Exception e) {
+            LOGGER.error("Failed to switch to window: {}", windowHandle, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets all window handles.
+     * 
+     * @return Set of all window handles
+     */
+    public Set<String> getWindowHandles() {
+        LOGGER.debug("Getting all window handles");
+        return getDriver().getWindowHandles();
+    }
+    
+    /**
+     * Gets the current window handle.
+     * 
+     * @return The current window handle
+     */
+    public String getWindowHandle() {
+        LOGGER.debug("Getting current window handle");
+        return getDriver().getWindowHandle();
+    }
+    
+    /**
+     * Accepts an alert if present.
+     */
+    public void acceptAlert() {
+        LOGGER.debug("Accepting alert");
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), defaultTimeout);
+            wait.until(ExpectedConditions.alertIsPresent());
+            getDriver().switchTo().alert().accept();
+            LOGGER.debug("Alert accepted");
+        } catch (Exception e) {
+            LOGGER.error("Failed to accept alert", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Dismisses an alert if present.
+     */
+    public void dismissAlert() {
+        LOGGER.debug("Dismissing alert");
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), defaultTimeout);
+            wait.until(ExpectedConditions.alertIsPresent());
+            getDriver().switchTo().alert().dismiss();
+            LOGGER.debug("Alert dismissed");
+        } catch (Exception e) {
+            LOGGER.error("Failed to dismiss alert", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets text from an alert if present.
+     * 
+     * @return The alert text
+     */
+    public String getAlertText() {
+        LOGGER.debug("Getting alert text");
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), defaultTimeout);
+            wait.until(ExpectedConditions.alertIsPresent());
+            String text = getDriver().switchTo().alert().getText();
+            LOGGER.debug("Got alert text: {}", text);
+            return text;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get alert text", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Sets browser window size.
+     * 
+     * @param width The window width
+     * @param height The window height
+     */
+    public void setWindowSize(int width, int height) {
+        LOGGER.debug("Setting window size: {}x{}", width, height);
+        try {
+            getDriver().manage().window().setSize(new Dimension(width, height));
+            LOGGER.debug("Window size set to: {}x{}", width, height);
+        } catch (Exception e) {
+            LOGGER.error("Failed to set window size: {}x{}", width, height, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Maximizes the browser window.
+     */
+    public void maximizeWindow() {
+        LOGGER.debug("Maximizing window");
+        try {
+            getDriver().manage().window().maximize();
+            LOGGER.debug("Window maximized");
+        } catch (Exception e) {
+            LOGGER.error("Failed to maximize window", e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Quits the WebDriver for the current thread.
+     */
+    public void quit() {
+        WebDriver driver = DRIVER_THREAD_LOCAL.get();
+        if (driver != null) {
+            LOGGER.info("Quitting WebDriver for current thread");
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                LOGGER.error("Error while quitting WebDriver", e);
+            } finally {
+                DRIVER_THREAD_LOCAL.remove();
+                ALL_DRIVERS.remove(Thread.currentThread().getId());
+            }
+        }
+    }
+    
+    /**
+     * Quits all WebDriver instances across all threads.
+     * Useful for cleanup before test suite completion.
+     */
+    public static void quitAll() {
+        LOGGER.info("Quitting all WebDriver instances");
+        ALL_DRIVERS.values().forEach(driver -> {
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                LOGGER.error("Error while quitting WebDriver instance", e);
+            }
+        });
+        
+        ALL_DRIVERS.clear();
+        DRIVER_THREAD_LOCAL.remove();
+    }
+}
+
+
+
+package com.cssmart.core.util;
+
+import com.cssmart.core.logging.CSSmartLogger;
+
+import java.time.Duration;
+import java.util.function.Predicate;
+
+/**
+ * Utility class for waiting operations.
+ * Provides fluent waiting capabilities with customizable intervals and timeouts.
+ */
+public class WaitUtils {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(WaitUtils.class);
+    
+    /**
+     * Waits for a condition to be met within the specified timeout.
+     *
+     * @param <T> The type of object being tested
+     * @param condition The condition to wait for
+     * @param timeout The maximum time to wait
+     * @param timeoutMessage Message to include in timeout exception
+     * @param objectToTest The object to test the condition against
+     * @throws TimeoutException if the condition is not met within the timeout
+     */
+    public static <T> void waitForCondition(
+            Predicate<T> condition,
+            Duration timeout,
+            String timeoutMessage,
+            T objectToTest) {
+        
+        waitForCondition(condition, timeout, Duration.ofMillis(500), timeoutMessage, objectToTest);
+    }
+    
+    /**
+     * Waits for a condition to be met with specified timeout and interval.
+     *
+     * @param <T> The type of object being tested
+     * @param condition The condition to wait for
+     * @param timeout The maximum time to wait
+     * @param interval The interval between condition checks
+     * @param timeoutMessage Message to include in timeout exception
+     * @param objectToTest The object to test the condition against
+     * @throws TimeoutException if the condition is not met within the timeout
+     */
+    public static <T> void waitForCondition(
+            Predicate<T> condition,
+            Duration timeout,
+            Duration interval,
+            String timeoutMessage,
+            T objectToTest) {
+        
+        long endTime = System.currentTimeMillis() + timeout.toMillis();
+        
+        while (System.currentTimeMillis() < endTime) {
+            if (condition.test(objectToTest)) {
+                return;
+            }
+            
+            try {
+                Thread.sleep(interval.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOGGER.warn("Wait interrupted", e);
+                throw new RuntimeException("Wait was interrupted", e);
+            }
+        }
+        
+        throw new java.util.concurrent.TimeoutException(timeoutMessage);
+    }
+    
+    /**
+     * Overloaded method for driver-related waits.
+     * 
+     * @param <T> The type of object being tested (usually a WebDriver)
+     * @param condition The condition to wait for
+     * @param timeout The maximum time to wait
+     * @param timeoutMessage Message to include in timeout exception
+     * @throws TimeoutException if the condition is not met within the timeout
+     */
+    public static <T> void waitForCondition(
+            Predicate<T> condition,
+            Duration timeout,
+            String timeoutMessage) {
+        
+        waitForCondition(condition, timeout, timeoutMessage, null);
+    }
+    
+    /**
+     * Sleep for a specified duration.
+     * NOTE: This should be used sparingly as explicit waits are preferred.
+     *
+     * @param duration The duration to sleep
+     */
+    public static void sleep(Duration duration) {
+        try {
+            LOGGER.debug("Sleeping for {} ms", duration.toMillis());
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Sleep interrupted", e);
+        }
+    }
+    
+    /**
+     * Custom TimeoutException class.
+     */
+    public static class TimeoutException extends RuntimeException {
+        public TimeoutException(String message) {
+            super(message);
+        }
+        
+        public TimeoutException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+}
+
+
+
+package com.cssmart.core.driver;
+
+import com.cssmart.core.config.CSSmartConfig;
+import com.cssmart.core.logging.CSSmartLogger;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.chrome.ChromeDriverService;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Chrome-specific implementation of CSSmartDriver.
+ * Provides configuration and initialization for Chrome browser.
+ */
+public class ChromeDriver extends CSSmartDriver {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(ChromeDriver.class);
+    
+    /**
+     * Constructs a new ChromeDriver with the specified configuration.
+     * 
+     * @param config The framework configuration
+     */
+    public ChromeDriver(CSSmartConfig config) {
+        super(config);
+    }
+    
+    /**
+     * Initializes a new Chrome WebDriver instance based on configuration.
+     * 
+     * @return A new Chrome WebDriver instance
+     */
+    @Override
+    protected WebDriver initializeDriver() {
+        LOGGER.info("Initializing Chrome WebDriver");
+        
+        try {
+            System.setProperty("webdriver.chrome.silentOutput", "true");
+            
+            ChromeOptions options = createChromeOptions();
+            
+            if (getConfig().getBoolean("driver.chrome.useDriverService", false)) {
+                return createDriverWithService(options);
+            } else {
+                return new org.openqa.selenium.chrome.ChromeDriver(options);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize Chrome WebDriver", e);
+            throw new RuntimeException("Chrome WebDriver initialization failed", e);
+        }
+    }
+    
+    /**
+     * Creates ChromeOptions based on configuration.
+     * 
+     * @return Configured ChromeOptions
+     */
+    private ChromeOptions createChromeOptions() {
+        ChromeOptions options = new ChromeOptions();
+        
+        // Handle headless mode
+        if (getConfig().getBoolean("driver.chrome.headless", false)) {
+            LOGGER.info("Running Chrome in headless mode");
+            options.addArguments("--headless=new");
+        }
+        
+        // Configure browser arguments
+        String[] browserArgs = getConfig().getStringArray("driver.chrome.arguments");
+        if (browserArgs != null && browserArgs.length > 0) {
+            LOGGER.debug("Adding Chrome arguments: {}", (Object) browserArgs);
+            options.addArguments(browserArgs);
+        }
+        
+        // Configure downloads directory
+        String downloadsDir = getConfig().getString("driver.chrome.downloads.directory");
+        if (downloadsDir != null && !downloadsDir.isEmpty()) {
+            LOGGER.debug("Setting Chrome downloads directory: {}", downloadsDir);
+            Map<String, Object> prefs = new HashMap<>();
+            prefs.put("download.default_directory", downloadsDir);
+            options.setExperimentalOption("prefs", prefs);
+        }
+        
+        // Configure custom browser binary
+        String binaryPath = getConfig().getString("driver.chrome.binary");
+        if (binaryPath != null && !binaryPath.isEmpty()) {
+            LOGGER.debug("Setting Chrome binary path: {}", binaryPath);
+            options.setBinary(binaryPath);
+        }
+        
+        return options;
+    }
+    
+    /**
+     * Creates a WebDriver with a custom ChromeDriverService.
+     * 
+     * @param options Chrome options
+     * @return WebDriver instance with custom service
+     */
+    private WebDriver createDriverWithService(ChromeOptions options) {
+        LOGGER.debug("Creating Chrome WebDriver with custom service");
+        
+        String driverPath = getConfig().getString("driver.chrome.executable");
+        if (driverPath == null || driverPath.isEmpty()) {
+            throw new IllegalStateException("Chrome driver executable path must be specified when using driver service");
+        }
+        
+        ChromeDriverService.Builder serviceBuilder = new ChromeDriverService.Builder()
+            .usingDriverExecutable(new File(driverPath));
+        
+        // Configure service port if specified
+        int port = getConfig().getInt("driver.chrome.port", 0);
+        if (port > 0) {
+            serviceBuilder.usingPort(port);
+        }
+        
+        ChromeDriverService service = serviceBuilder.build();
+        
+        return new org.openqa.selenium.chrome.ChromeDriver(service, options);
+    }
+    
+    /**
+     * Gets the framework configuration.
+     * 
+     * @return The CSSmartConfig instance
+     */
+    private CSSmartConfig getConfig() {
+        return super.config;
+    }
+}
+
+
+
+package com.cssmart.core.element;
+
+import com.cssmart.core.driver.CSSmartDriver;
+import com.cssmart.core.logging.CSSmartLogger;
+import org.openqa.selenium.*;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Enhanced WebElement implementation with additional functionality,
+ * error handling, and logging.
+ */
+public class CSSmartWebElement implements WebElement {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartWebElement.class);
+    
+    private final CSSmartDriver driver;
+    private final By locator;
+    private final WebElement element;
+    private final Duration defaultTimeout;
+    
+    /**
+     * Constructs a new CSSmartWebElement.
+     * 
+     * @param driver The CSSmartDriver
+     * @param locator The locator for this element
+     * @param element The underlying WebElement
+     * @param defaultTimeout The default timeout for operations
+     */
+    public CSSmartWebElement(CSSmartDriver driver, By locator, WebElement element, Duration defaultTimeout) {
+        this.driver = driver;
+        this.locator = locator;
+        this.element = element;
+        this.defaultTimeout = defaultTimeout;
+    }
+    
+    /**
+     * Constructs a new CSSmartWebElement.
+     * 
+     * @param driver The CSSmartDriver
+     * @param locator The locator for this element
+     * @param element The underlying WebElement
+     */
+    public CSSmartWebElement(CSSmartDriver driver, By locator, WebElement element) {
+        this(driver, locator, element, Duration.ofSeconds(30));
+    }
+    
+    /**
+     * Gets the locator for this element.
+     * 
+     * @return The By locator
+     */
+    public By getLocator() {
+        return locator;
+    }
+    
+    /**
+     * Gets the underlying WebElement.
+     * 
+     * @return The WebElement
+     */
+    public WebElement getElement() {
+        return element;
+    }
+    
+    /**
+     * Clicks the element with retry logic.
+     */
+    @Override
+    public void click() {
+        LOGGER.debug("Clicking element: {}", locator);
+        try {
+            waitForElementToBeClickable();
+            element.click();
+            LOGGER.debug("Clicked element: {}", locator);
+        } catch (ElementClickInterceptedException e) {
+            LOGGER.warn("Element click intercepted, trying JavaScript click: {}", locator);
+            jsClick();
+        } catch (Exception e) {
+            LOGGER.error("Failed to click element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Performs a JavaScript click on the element.
+     */
+    public void jsClick() {
+        LOGGER.debug("Performing JavaScript click on element: {}", locator);
+        try {
+            JavascriptExecutor js = (JavascriptExecutor) driver.getDriver();
+            js.executeScript("arguments[0].click();", element);
+            LOGGER.debug("Performed JavaScript click on element: {}", locator);
+        } catch (Exception e) {
+            LOGGER.error("Failed to perform JavaScript click on element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Submits a form.
+     */
+    @Override
+    public void submit() {
+        LOGGER.debug("Submitting form with element: {}", locator);
+        try {
+            element.submit();
+            LOGGER.debug("Submitted form with element: {}", locator);
+        } catch (Exception e) {
+            LOGGER.error("Failed to submit form with element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Sends keys to the element.
+     * 
+     * @param charSequences Text to send
+     */
+    @Override
+    public void sendKeys(CharSequence... charSequences) {
+        sendKeys(true, charSequences);
+    }
+    
+    /**
+     * Sends keys to the element with option to clear first.
+     * 
+     * @param clearFirst Whether to clear the field first
+     * @param charSequences Text to send
+     */
+    public void sendKeys(boolean clearFirst, CharSequence... charSequences) {
+        LOGGER.debug("Sending keys to element: {} text: {}", locator, charSequences);
+        try {
+            if (clearFirst) {
+                clear();
+            }
+            element.sendKeys(charSequences);
+            LOGGER.debug("Sent keys to element: {}", locator);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send keys to element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Types text slowly, character by character.
+     * Useful for JS-heavy inputs that validate during typing.
+     * 
+     * @param text Text to type
+     * @param delayMillis Delay between characters in milliseconds
+     */
+    public void typeSlowly(String text, long delayMillis) {
+        LOGGER.debug("Typing slowly to element: {} text: {}", locator, text);
+        try {
+            clear();
+            for (char c : text.toCharArray()) {
+                element.sendKeys(String.valueOf(c));
+                try {
+                    Thread.sleep(delayMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    LOGGER.warn("Slow typing interrupted", e);
+                }
+            }
+            LOGGER.debug("Typed slowly to element: {}", locator);
+        } catch (Exception e) {
+            LOGGER.error("Failed to type slowly to element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Clears the element content.
+     */
+    @Override
+    public void clear() {
+        LOGGER.debug("Clearing element: {}", locator);
+        try {
+            element.clear();
+            LOGGER.debug("Cleared element: {}", locator);
+        } catch (Exception e) {
+            LOGGER.error("Failed to clear element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the tag name of the element.
+     * 
+     * @return The tag name
+     */
+    @Override
+    public String getTagName() {
+        LOGGER.debug("Getting tag name for element: {}", locator);
+        try {
+            String tagName = element.getTagName();
+            LOGGER.debug("Got tag name for element: {} tagName: {}", locator, tagName);
+            return tagName;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get tag name for element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the attribute value of the element.
+     * 
+     * @param name The attribute name
+     * @return The attribute value
+     */
+    @Override
+    public String getAttribute(String name) {
+        LOGGER.debug("Getting attribute '{}' for element: {}", name, locator);
+        try {
+            String value = element.getAttribute(name);
+            LOGGER.debug("Got attribute '{}' for element: {} value: {}", name, locator, value);
+            return value;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get attribute '{}' for element: {}", name, locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Checks if the element is selected.
+     * 
+     * @return true if selected, false otherwise
+     */
+    @Override
+    public boolean isSelected() {
+        LOGGER.debug("Checking if element is selected: {}", locator);
+        try {
+            boolean selected = element.isSelected();
+            LOGGER.debug("Element selected status: {} isSelected: {}", locator, selected);
+            return selected;
+        } catch (Exception e) {
+            LOGGER.error("Failed to check if element is selected: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Checks if the element is enabled.
+     * 
+     * @return true if enabled, false otherwise
+     */
+    @Override
+    public boolean isEnabled() {
+        LOGGER.debug("Checking if element is enabled: {}", locator);
+        try {
+            boolean enabled = element.isEnabled();
+            LOGGER.debug("Element enabled status: {} isEnabled: {}", locator, enabled);
+            return enabled;
+        } catch (Exception e) {
+            LOGGER.error("Failed to check if element is enabled: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the text content of the element.
+     * 
+     * @return The text content
+     */
+    @Override
+    public String getText() {
+        LOGGER.debug("Getting text for element: {}", locator);
+        try {
+            String text = element.getText();
+            LOGGER.debug("Got text for element: {} text: {}", locator, text);
+            return text;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get text for element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Finds all child elements matching the given locator.
+     * 
+     * @param by The locator for child elements
+     * @return List of child elements
+     */
+    @Override
+    public List<WebElement> findElements(By by) {
+        LOGGER.debug("Finding child elements {} within parent: {}", by, locator);
+        try {
+            List<WebElement> elements = element.findElements(by);
+            LOGGER.debug("Found {} child elements within parent: {}", elements.size(), locator);
+            
+            // Wrap all WebElements in CSSmartWebElement
+            return elements.stream()
+                .map(webElement -> new CSSmartWebElement(driver, by, webElement, defaultTimeout))
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            LOGGER.error("Failed to find child elements {} within parent: {}", by, locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Finds a child element matching the given locator.
+     * 
+     * @param by The locator for the child element
+     * @return The child element
+     */
+    @Override
+    public WebElement findElement(By by) {
+        LOGGER.debug("Finding child element {} within parent: {}", by, locator);
+        try {
+            WebElement childElement = element.findElement(by);
+            LOGGER.debug("Found child element within parent: {}", locator);
+            return new CSSmartWebElement(driver, by, childElement, defaultTimeout);
+        } catch (Exception e) {
+            LOGGER.error("Failed to find child element {} within parent: {}", by, locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Checks if the element is displayed.
+     * 
+     * @return true if displayed, false otherwise
+     */
+    @Override
+    public boolean isDisplayed() {
+        LOGGER.debug("Checking if element is displayed: {}", locator);
+        try {
+            boolean displayed = element.isDisplayed();
+            LOGGER.debug("Element displayed status: {} isDisplayed: {}", locator, displayed);
+            return displayed;
+        } catch (Exception e) {
+            LOGGER.debug("Element is not displayed: {} - {}", locator, e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Gets the element location.
+     * 
+     * @return The element location
+     */
+    @Override
+    public Point getLocation() {
+        LOGGER.debug("Getting location for element: {}", locator);
+        try {
+            Point location = element.getLocation();
+            LOGGER.debug("Got location for element: {} location: {}", locator, location);
+            return location;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get location for element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the element size.
+     * 
+     * @return The element size
+     */
+    @Override
+    public Dimension getSize() {
+        LOGGER.debug("Getting size for element: {}", locator);
+        try {
+            Dimension size = element.getSize();
+            LOGGER.debug("Got size for element: {} size: {}", locator, size);
+            return size;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get size for element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Gets the element CSS value.
+     * 
+     * @param propertyName The CSS property name
+     * @return The CSS value
+     */
+    @Override
+    public String getCssValue(String propertyName) {
+        LOGGER.debug("Getting CSS value '{}' for element: {}", propertyName, locator);
+        try {
+            String value = element.getCssValue(propertyName);
+            LOGGER.debug("Got CSS value '{}' for element: {} value: {}", propertyName, locator, value);
+            return value;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get CSS value '{}' for element: {}", propertyName, locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Waits for the element to be clickable.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement waitForElementToBeClickable() {
+        return waitForElementToBeClickable(defaultTimeout);
+    }
+    
+    /**
+     * Waits for the element to be clickable with custom timeout.
+     * 
+     * @param timeout The timeout duration
+     * @return This element
+     */
+    public CSSmartWebElement waitForElementToBeClickable(Duration timeout) {
+        LOGGER.debug("Waiting for element to be clickable: {}", locator);
+        try {
+            WebDriverWait wait = new WebDriverWait(driver.getDriver(), timeout);
+            wait.until(ExpectedConditions.elementToBeClickable(element));
+            LOGGER.debug("Element is now clickable: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Element not clickable within timeout: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Waits for the element to be visible.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement waitForElementToBeVisible() {
+        return waitForElementToBeVisible(defaultTimeout);
+    }
+    
+    /**
+     * Waits for the element to be visible with custom timeout.
+     * 
+     * @param timeout The timeout duration
+     * @return This element
+     */
+    public CSSmartWebElement waitForElementToBeVisible(Duration timeout) {
+        LOGGER.debug("Waiting for element to be visible: {}", locator);
+        try {
+            WebDriverWait wait = new WebDriverWait(driver.getDriver(), timeout);
+            wait.until(ExpectedConditions.visibilityOf(element));
+            LOGGER.debug("Element is now visible: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Element not visible within timeout: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Waits for the element to contain text.
+     * 
+     * @param text The text to wait for
+     * @return This element
+     */
+    public CSSmartWebElement waitForTextToBe(String text) {
+        return waitForTextToBe(text, defaultTimeout);
+    }
+    
+    /**
+     * Waits for the element to contain text with custom timeout.
+     * 
+     * @param text The text to wait for
+     * @param timeout The timeout duration
+     * @return This element
+     */
+    public CSSmartWebElement waitForTextToBe(String text, Duration timeout) {
+        LOGGER.debug("Waiting for element text to be '{}': {}", text, locator);
+        try {
+            WebDriverWait wait = new WebDriverWait(driver.getDriver(), timeout);
+            wait.until(ExpectedConditions.textToBePresentInElement(element, text));
+            LOGGER.debug("Element text is now '{}': {}", text, locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Element text not '{}' within timeout: {}", text, locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Scrolls the element into view.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement scrollIntoView() {
+        LOGGER.debug("Scrolling element into view: {}", locator);
+        try {
+            JavascriptExecutor js = (JavascriptExecutor) driver.getDriver();
+            js.executeScript("arguments[0].scrollIntoView(true);", element);
+            LOGGER.debug("Scrolled element into view: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to scroll element into view: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Hovers over the element.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement hover() {
+        LOGGER.debug("Hovering over element: {}", locator);
+        try {
+            Actions actions = new Actions(driver.getDriver());
+            actions.moveToElement(element).perform();
+            LOGGER.debug("Hovered over element: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to hover over element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Performs right-click on the element.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement rightClick() {
+        LOGGER.debug("Right-clicking element: {}", locator);
+        try {
+            Actions actions = new Actions(driver.getDriver());
+            actions.contextClick(element).perform();
+            LOGGER.debug("Right-clicked element: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to right-click element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Performs double-click on the element.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement doubleClick() {
+        LOGGER.debug("Double-clicking element: {}", locator);
+        try {
+            Actions actions = new Actions(driver.getDriver());
+            actions.doubleClick(element).perform();
+            LOGGER.debug("Double-clicked element: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to double-click element: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Drags this element and drops it onto another element.
+     * 
+     * @param target The target element to drop onto
+     * @return This element
+     */
+    public CSSmartWebElement dragAndDropTo(WebElement target) {
+        LOGGER.debug("Dragging element to target: {}", locator);
+        try {
+            Actions actions = new Actions(driver.getDriver());
+            actions.dragAndDrop(element, target).perform();
+            LOGGER.debug("Dragged element to target: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to drag element to target: {}", locator, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Highlights the element temporarily for visual debugging.
+     * 
+     * @return This element
+     */
+    public CSSmartWebElement highlight() {
+        return highlight(Duration.ofSeconds(2));
+    }
+    
+    /**
+     * Highlights the element for a specified duration.
+     * 
+     * @param duration The highlight duration
+     * @return This element
+     */
+    public CSSmartWebElement highlight(Duration duration) {
+        LOGGER.debug("Highlighting element: {}", locator);
+        try {
+            JavascriptExecutor js = (JavascriptExecutor) driver.getDriver();
+            
+            // Store original style
+            String originalStyle = element.getAttribute("style");
+            
+            // Apply highlight
+            js.executeScript(
+                "arguments[0].setAttribute('style', 'border: 2px solid red; background-color: yellow;');",
+                element);
+            
+            // Wait for specified duration
+            try {
+                Thread.sleep(duration.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Restore original style
+            js.executeScript(
+                "arguments[0].setAttribute('style', arguments[1]);",
+                element, originalStyle);
+            
+            LOGGER.debug("Highlighted element: {}", locator);
+            return this;
+        } catch (Exception e) {
+            LOGGER.error("Failed to highlight element: {}", locator, e);
+            // Non-critical error, don't throw
+            return this;
+        }
+    }
+    
+    /**
+     * Takes a screenshot of this element.
+     * 
+     * @return The screenshot as bytes
+     */
+    public byte[] takeScreenshot() {
+        LOGGER.debug("Taking screenshot of element: {}", locator);
+        try {
+            if (element instanceof TakesScreenshot) {
+                byte[] screenshot = ((TakesScreenshot) element).getScreenshotAs(OutputType.BYTES);
+                LOGGER.debug("Took screenshot of element: {}", locator);
+                return screenshot;
+            } else {
+                LOGGER.warn("Element does not support taking screenshots: {}", locator);
+                throw new UnsupportedOperationException("Element does not support taking screenshots");
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot of element: {}", locator, e);
+            throw e;
+        }
+    }
+
+    @Override
+    public <X> X getScreenshotAs(OutputType<X> outputType) throws WebDriverException {
+        LOGGER.debug("Getting screenshot as {}: {}", outputType, locator);
+        try {
+            X screenshot = element.getScreenshotAs(outputType);
+            LOGGER.debug("Got screenshot: {}", locator);
+            return screenshot;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get screenshot: {}", locator, e);
+            throw e;
+        }
+    }
+
+    @Override
+    public Rectangle getRect() {
+        LOGGER.debug("Getting rectangle for element: {}", locator);
+        try {
+            Rectangle rect = element.getRect();
+            LOGGER.debug("Got rectangle for element: {} rect: {}", locator, rect);
+            return rect;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get rectangle for element: {}", locator, e);
+            throw e;
+        }
+    }
+}
+
+
+
+package com.cssmart.core.util;
+
+import com.cssmart.core.driver.CSSmartDriver;
+import com.cssmart.core.element.CSSmartWebElement;
+import com.cssmart.core.logging.CSSmartLogger;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.WebElement;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
+
+/**
+ * Utility class for capturing and managing screenshots.
+ * Provides methods for taking screenshots of the entire page or specific elements.
+ */
+public class CSSmartScreenshot {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartScreenshot.class);
+    private static final String DEFAULT_SCREENSHOT_DIR = "target/screenshots";
+    
+    private final CSSmartDriver driver;
+    private final String screenshotDir;
+    
+    /**
+     * Constructs a new CSSmartScreenshot with the specified driver.
+     * 
+     * @param driver The CSSmartDriver
+     */
+    public CSSmartScreenshot(CSSmartDriver driver) {
+        this(driver, DEFAULT_SCREENSHOT_DIR);
+    }
+    
+    /**
+     * Constructs a new CSSmartScreenshot with the specified driver and screenshot directory.
+     * 
+     * @param driver The CSSmartDriver
+     * @param screenshotDir The directory to save screenshots
+     */
+    public CSSmartScreenshot(CSSmartDriver driver, String screenshotDir) {
+        this.driver = driver;
+        this.screenshotDir = screenshotDir;
+        
+        initScreenshotDirectory();
+    }
+    
+    /**
+     * Initializes the screenshot directory.
+     */
+    private void initScreenshotDirectory() {
+        try {
+            Path path = Paths.get(screenshotDir);
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+                LOGGER.info("Created screenshot directory: {}", screenshotDir);
+            }
+        } catch (IOException e) {
+            LOGGER.error("Failed to create screenshot directory: {}", screenshotDir, e);
+        }
+    }
+    
+    /**
+     * Takes a screenshot of the entire page.
+     * 
+     * @return The path to the saved screenshot file
+     */
+    public String takeScreenshot() {
+        return takeScreenshot("screenshot");
+    }
+    
+    /**
+     * Takes a screenshot of the entire page with a custom base name.
+     * 
+     * @param baseName The base name for the screenshot file
+     * @return The path to the saved screenshot file
+     */
+    public String takeScreenshot(String baseName) {
+        LOGGER.info("Taking screenshot: {}", baseName);
+        
+        try {
+            TakesScreenshot screenshotDriver = (TakesScreenshot) driver.getDriver();
+            byte[] screenshotBytes = screenshotDriver.getScreenshotAs(OutputType.BYTES);
+            
+            String fileName = generateFileName(baseName);
+            String filePath = saveScreenshot(screenshotBytes, fileName);
+            
+            LOGGER.info("Screenshot saved: {}", filePath);
+            return filePath;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot: {}", baseName, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Takes a screenshot of a specific element.
+     * 
+     * @param element The element to screenshot
+     * @param baseName The base name for the screenshot file
+     * @return The path to the saved screenshot file
+     */
+    public String takeElementScreenshot(CSSmartWebElement element, String baseName) {
+        LOGGER.info("Taking element screenshot: {}", baseName);
+        
+        try {
+            byte[] screenshotBytes = element.takeScreenshot();
+            
+            String fileName = generateFileName(baseName + "_element");
+            String filePath = saveScreenshot(screenshotBytes, fileName);
+            
+            LOGGER.info("Element screenshot saved: {}", filePath);
+            return filePath;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take element screenshot: {}", baseName, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Takes a screenshot of a specific element.
+     * 
+     * @param element The WebElement to screenshot
+     * @param baseName The base name for the screenshot file
+     * @return The path to the saved screenshot file
+     */
+    public String takeElementScreenshot(WebElement element, String baseName) {
+        LOGGER.info("Taking WebElement screenshot: {}", baseName);
+        
+        try {
+            byte[] screenshotBytes = element.getScreenshotAs(OutputType.BYTES);
+            
+            String fileName = generateFileName(baseName + "_element");
+            String filePath = saveScreenshot(screenshotBytes, fileName);
+            
+            LOGGER.info("WebElement screenshot saved: {}", filePath);
+            return filePath;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take WebElement screenshot: {}", baseName, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Takes a screenshot and returns it as a Base64 encoded string.
+     * 
+     * @return The Base64 encoded screenshot
+     */
+    public String takeScreenshotAsBase64() {
+        LOGGER.info("Taking screenshot as Base64");
+        
+        try {
+            TakesScreenshot screenshotDriver = (TakesScreenshot) driver.getDriver();
+            String base64Screenshot = screenshotDriver.getScreenshotAs(OutputType.BASE64);
+            LOGGER.debug("Screenshot taken as Base64");
+            return base64Screenshot;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot as Base64", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Takes a screenshot and returns it as a BufferedImage.
+     * 
+     * @return The screenshot as BufferedImage
+     */
+    public BufferedImage takeScreenshotAsImage() {
+        LOGGER.info("Taking screenshot as image");
+        
+        try {
+            TakesScreenshot screenshotDriver = (TakesScreenshot) driver.getDriver();
+            byte[] screenshotBytes = screenshotDriver.getScreenshotAs(OutputType.BYTES);
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(screenshotBytes));
+            LOGGER.debug("Screenshot taken as image");
+            return image;
+        } catch (Exception e) {
+            LOGGER.error("Failed to take screenshot as image", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Generates a filename for the screenshot with timestamp.
+     * 
+     * @param baseName The base name for the file
+     * @return The generated filename
+     */
+    private String generateFileName(String baseName) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+        String timestamp = LocalDateTime.now().format(formatter);
+        return baseName + "_" + timestamp + ".png";
+    }
+    
+    /**
+     * Saves screenshot bytes to a file.
+     * 
+     * @param screenshotBytes The screenshot bytes
+     * @param fileName The filename to save as
+     * @return The path to the saved file
+     * @throws IOException if saving fails
+     */
+    private String saveScreenshot(byte[] screenshotBytes, String fileName) throws IOException {
+        String filePath = screenshotDir + File.separator + fileName;
+        Path path = Paths.get(filePath);
+        Files.write(path, screenshotBytes);
+        return filePath;
+    }
+    
+    /**
+     * Compares two images for similarity.
+     * 
+     * @param image1 The first image
+     * @param image2 The second image
+     * @param threshold The similarity threshold (0.0 to 1.0)
+     * @return true if images are similar, false otherwise
+     */
+    public boolean compareImages(BufferedImage image1, BufferedImage image2, double threshold) {
+        LOGGER.info("Comparing images with threshold: {}", threshold);
+        
+        if (image1.getWidth() != image2.getWidth() || image1.getHeight() != image2.getHeight()) {
+            LOGGER.warn("Images have different dimensions");
+            return false;
+        }
+        
+        long diffPixels = 0;
+        int totalPixels = image1.getWidth() * image1.getHeight();
+        
+        for (int y = 0; y < image1.getHeight(); y++) {
+            for (int x = 0; x < image1.getWidth(); x++) {
+                int rgb1 = image1.getRGB(x, y);
+                int rgb2 = image2.getRGB(x, y);
+                
+                // Compare RGB values
+                if (rgb1 != rgb2) {
+                    diffPixels++;
+                }
+            }
+        }
+        
+        double similarity = 1.0 - ((double) diffPixels / totalPixels);
+        LOGGER.info("Image comparison: similarity = {}", similarity);
+        
+        return similarity >= threshold;
+    }
+    
+    /**
+     * Embeds a screenshot into an HTML report.
+     * 
+     * @param screenshotPath The path to the screenshot file
+     * @return HTML code for embedding the screenshot
+     */
+    public String embedScreenshotInReport(String screenshotPath) {
+        try {
+            byte[] screenshotBytes = Files.readAllBytes(Paths.get(screenshotPath));
+            String base64Image = Base64.getEncoder().encodeToString(screenshotBytes);
+            return "<img src=\"data:image/png;base64," + base64Image + "\" alt=\"Screenshot\" />";
+        } catch (IOException e) {
+            LOGGER.error("Failed to embed screenshot in report: {}", screenshotPath, e);
+            return "<p>Screenshot not available: " + screenshotPath + "</p>";
+        }
+    }
+}
+
+
+
