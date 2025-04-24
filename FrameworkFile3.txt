@@ -1,0 +1,5450 @@
+src/
+├── main/
+│   ├── java/
+│   │   └── com/
+│   │       └── cssmart/
+│   │           ├── config/
+│   │           │   ├── CSSmartConfig.java
+│   │           │   └── PropertyManager.java
+│   │           ├── driver/
+│   │           │   ├── CSSmartDriver.java
+│   │           │   └── BrowserManager.java
+│   │           ├── element/
+│   │           │   ├── CSSmartWebElement.java
+│   │           │   └── CSSmartFindBy.java
+│   │           ├── reporting/
+│   │           │   ├── CSSmartReport.java
+│   │           │   ├── CSSmartTestResult.java
+│   │           │   └── CSSmartTestStep.java
+│   │           ├── utils/
+│   │           │   ├── CSSmartScreenshot.java
+│   │           │   └── WaitUtils.java
+│   │           ├── ui/
+│   │           │   ├── CSSmartBasePage.java
+│   │           │   └── CSSmartTestBase.java
+│   │           ├── api/
+│   │           │   ├── CSSmartApiClient.java
+│   │           │   ├── CSSmartApiRequest.java
+│   │           │   ├── CSSmartApiResponse.java
+│   │           │   ├── CSSmartApiTestBase.java
+│   │           │   └── CSSmartSchemaValidator.java
+│   │           ├── db/
+│   │           │   ├── CSSmartDatabaseClient.java
+│   │           │   └── CSSmartDbTestBase.java
+│   │           ├── ai/
+│   │           │   ├── CSSmartAIAnalyzer.java
+│   │           │   ├── CSSmartAIElementFinder.java
+│   │           │   └── CSSmartAITestBase.java
+│   │           ├── healing/
+│   │           │   ├── HealingManager.java
+│   │           │   ├── LocatorHealer.java
+│   │           │   ├── HealingHistory.java
+│   │           │   └── ElementDescriptionAnalyzer.java
+│   │           └── bdd/
+│   │               ├── CSSmartTestStep.java
+│   │               ├── CSSmartBDDTestFactory.java
+│   │               ├── CSSmartBDDScanner.java
+│   │               ├── CSSmartBDDExecutor.java
+│   │               ├── CSSmartBDDParser.java
+│   │               └── CSSmartScenario.java
+│   └── resources/
+│       ├── config/
+│       │   └── cssmart-default.properties
+│       └── ai-models/
+│           ├── element-descriptions.json
+│           └── healing-patterns.json
+└── test/
+    ├── java/
+    │   └── com/
+    │       └── cssmart/
+    │           ├── examples/
+    │           │   ├── ui/
+    │           │   │   ├── pages/
+    │           │   │   │   ├── LoginPage.java
+    │           │   │   │   └── HomePage.java
+    │           │   │   └── tests/
+    │           │   │       └── LoginTest.java
+    │           │   ├── api/
+    │           │   │   └── ApiTestExample.java
+    │           │   ├── db/
+    │           │   │   └── DatabaseTestExample.java
+    │           │   ├── ai/
+    │           │   │   └── AITestExample.java
+    │           │   ├── healing/
+    │           │   │   └── SelfHealingTestExample.java
+    │           │   └── bdd/
+    │           │       ├── steps/
+    │           │       │   └── LoginSteps.java
+    │           │       └── features/
+    │           │           └── login.feature
+    │           └── unit/
+    │               ├── HealingManagerTest.java
+    │               ├── LocatorHealerTest.java
+    │               └── AIElementFinderTest.java
+    └── resources/
+        ├── testdata/
+        │   └── test-users.json
+        ├── healing-data/
+        │   └── test-locators.json
+        └── testng.xml
+
+
+
+        package com.cssmart.ai.interpreter;
+
+import com.cssmart.ai.CSSmartAIElementFinder;
+import com.cssmart.bdd.CSSmartBDDExecutor;
+import com.cssmart.bdd.CSSmartScenario;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.element.CSSmartWebElement;
+import com.cssmart.reporting.CSSmartReport;
+import com.cssmart.reporting.CSSmartTestStep;
+import com.cssmart.ui.CSSmartBasePage;
+import com.cssmart.utils.WaitUtils;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Main interpreter class that orchestrates the AI-powered test execution
+ * from natural language feature files without step definition code.
+ */
+public class FeatureInterpreter {
+    private final ActionResolver actionResolver;
+    private final ElementResolver elementResolver;
+    private final ContextManager contextManager;
+    private final NLPProcessor nlpProcessor;
+    private final CSSmartReport reporter;
+    
+    public FeatureInterpreter(CSSmartDriver driver) {
+        this.actionResolver = new ActionResolver(driver);
+        this.elementResolver = new ElementResolver(driver);
+        this.contextManager = new ContextManager();
+        this.nlpProcessor = new NLPProcessor();
+        this.reporter = CSSmartReport.getInstance();
+    }
+    
+    /**
+     * Interprets and executes a single step from a feature file
+     * @param stepText The raw text of the step (e.g., "I click the login button")
+     * @return true if successful, false otherwise
+     */
+    public boolean interpretAndExecute(String stepText) {
+        reporter.logInfo("AI Interpreter executing: " + stepText);
+        try {
+            // Parse the step text
+            NLPResult nlpResult = nlpProcessor.analyze(stepText);
+            
+            // Identify the action, element and value
+            String action = nlpResult.getAction();
+            String elementDescription = nlpResult.getElementDescription();
+            String value = nlpResult.getValue();
+            
+            reporter.logDebug("Parsed action: " + action);
+            reporter.logDebug("Parsed element: " + elementDescription);
+            if (value != null) {
+                reporter.logDebug("Parsed value: " + value);
+            }
+            
+            // Find the element if needed for this action
+            CSSmartWebElement element = null;
+            if (elementDescription != null) {
+                element = elementResolver.findElement(elementDescription, contextManager.getCurrentPage());
+                if (element == null) {
+                    reporter.logError("Could not find element: " + elementDescription);
+                    return false;
+                }
+                reporter.logDebug("Found element matching description: " + elementDescription);
+            }
+            
+            // Execute the action
+            ActionResult result = actionResolver.executeAction(action, element, value);
+            
+            // Update context based on result
+            contextManager.updateContext(result);
+            
+            // Log the result
+            if (result.isSuccess()) {
+                reporter.logPass("Successfully executed: " + stepText);
+                return true;
+            } else {
+                reporter.logFail("Failed to execute: " + stepText + ". Error: " + result.getMessage());
+                return false;
+            }
+        } catch (Exception e) {
+            reporter.logError("Exception during step execution: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Executes an entire scenario with multiple steps
+     * @param scenario The scenario to execute
+     * @return true if all steps passed, false otherwise
+     */
+    public boolean executeScenario(CSSmartScenario scenario) {
+        reporter.startScenario(scenario.getName());
+        contextManager.resetContext();
+        
+        boolean allStepsPassed = true;
+        for (CSSmartTestStep step : scenario.getSteps()) {
+            reporter.startStep(step.getDescription());
+            boolean stepResult = interpretAndExecute(step.getDescription());
+            reporter.endStep(stepResult);
+            
+            if (!stepResult) {
+                allStepsPassed = false;
+                // Continue executing remaining steps or break based on configuration
+                if (contextManager.shouldStopOnFailure()) {
+                    break;
+                }
+            }
+        }
+        
+        reporter.endScenario(allStepsPassed);
+        return allStepsPassed;
+    }
+}
+
+/**
+ * Resolves natural language actions into framework method calls
+ */
+class ActionResolver {
+    private final CSSmartDriver driver;
+    private final Map<String, ActionType> actionMap;
+    
+    public ActionResolver(CSSmartDriver driver) {
+        this.driver = driver;
+        this.actionMap = initializeActionMap();
+    }
+    
+    private Map<String, ActionType> initializeActionMap() {
+        Map<String, ActionType> map = new HashMap<>();
+        
+        // Navigation actions
+        map.put("navigate to", ActionType.NAVIGATE);
+        map.put("go to", ActionType.NAVIGATE);
+        map.put("open", ActionType.NAVIGATE);
+        map.put("am on", ActionType.NAVIGATE);
+        
+        // Click actions
+        map.put("click", ActionType.CLICK);
+        map.put("press", ActionType.CLICK);
+        map.put("select", ActionType.CLICK);
+        map.put("choose", ActionType.CLICK);
+        
+        // Input actions
+        map.put("enter", ActionType.INPUT);
+        map.put("type", ActionType.INPUT);
+        map.put("fill", ActionType.INPUT);
+        map.put("input", ActionType.INPUT);
+        
+        // Verification actions
+        map.put("see", ActionType.VERIFY_VISIBLE);
+        map.put("verify", ActionType.VERIFY_VISIBLE);
+        map.put("should see", ActionType.VERIFY_VISIBLE);
+        map.put("should contain", ActionType.VERIFY_TEXT);
+        map.put("should have", ActionType.VERIFY_ATTRIBUTE);
+        
+        // Wait actions
+        map.put("wait for", ActionType.WAIT);
+        map.put("wait until", ActionType.WAIT);
+        
+        return map;
+    }
+    
+    /**
+     * Executes the specified action on the element with the given value
+     */
+    public ActionResult executeAction(String action, CSSmartWebElement element, String value) {
+        ActionType actionType = determineActionType(action);
+        if (actionType == null) {
+            return new ActionResult(false, "Unknown action: " + action);
+        }
+        
+        switch (actionType) {
+            case NAVIGATE:
+                return navigateTo(value);
+            case CLICK:
+                return clickElement(element);
+            case INPUT:
+                return inputText(element, value);
+            case VERIFY_VISIBLE:
+                return verifyElementVisible(element);
+            case VERIFY_TEXT:
+                return verifyElementText(element, value);
+            case VERIFY_ATTRIBUTE:
+                return verifyElementAttribute(element, value);
+            case WAIT:
+                return waitForElement(element);
+            default:
+                return new ActionResult(false, "Action not implemented: " + actionType);
+        }
+    }
+    
+    private ActionType determineActionType(String action) {
+        for (Map.Entry<String, ActionType> entry : actionMap.entrySet()) {
+            if (action.toLowerCase().contains(entry.getKey().toLowerCase())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+    
+    private ActionResult navigateTo(String url) {
+        try {
+            driver.get(url);
+            return new ActionResult(true, "Navigated to: " + url);
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to navigate: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult clickElement(CSSmartWebElement element) {
+        try {
+            element.click();
+            return new ActionResult(true, "Clicked element");
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to click: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult inputText(CSSmartWebElement element, String text) {
+        try {
+            element.clear();
+            element.sendKeys(text);
+            return new ActionResult(true, "Input text: " + text);
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to input text: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult verifyElementVisible(CSSmartWebElement element) {
+        try {
+            boolean isVisible = element.isDisplayed();
+            return new ActionResult(isVisible, 
+                isVisible ? "Element is visible" : "Element is not visible");
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to verify visibility: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult verifyElementText(CSSmartWebElement element, String expectedText) {
+        try {
+            String actualText = element.getText();
+            boolean matches = actualText.contains(expectedText);
+            return new ActionResult(matches, 
+                matches ? "Text verified" : "Expected '" + expectedText + "' but got '" + actualText + "'");
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to verify text: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult verifyElementAttribute(CSSmartWebElement element, String attributeValue) {
+        try {
+            // Parse expected attribute and value (e.g., "class containing 'active'")
+            String[] parts = attributeValue.split(" containing ");
+            if (parts.length != 2) {
+                return new ActionResult(false, "Invalid attribute format. Use 'attribute containing value'");
+            }
+            
+            String attribute = parts[0].trim();
+            String expectedValue = parts[1].replace("'", "").trim();
+            
+            String actualValue = element.getAttribute(attribute);
+            boolean matches = actualValue != null && actualValue.contains(expectedValue);
+            
+            return new ActionResult(matches, 
+                matches ? "Attribute verified" : "Expected attribute '" + attribute + 
+                "' to contain '" + expectedValue + "' but got '" + actualValue + "'");
+        } catch (Exception e) {
+            return new ActionResult(false, "Failed to verify attribute: " + e.getMessage());
+        }
+    }
+    
+    private ActionResult waitForElement(CSSmartWebElement element) {
+        try {
+            WaitUtils.waitForElementToBeVisible(element);
+            return new ActionResult(true, "Successfully waited for element");
+        } catch (Exception e) {
+            return new ActionResult(false, "Wait timeout: " + e.getMessage());
+        }
+    }
+    
+    public enum ActionType {
+        NAVIGATE,
+        CLICK,
+        INPUT,
+        VERIFY_VISIBLE,
+        VERIFY_TEXT,
+        VERIFY_ATTRIBUTE,
+        WAIT
+    }
+}
+
+/**
+ * Resolves element descriptions to actual WebElements using AI
+ */
+class ElementResolver {
+    private final CSSmartDriver driver;
+    private final CSSmartAIElementFinder aiFinder;
+    
+    public ElementResolver(CSSmartDriver driver) {
+        this.driver = driver;
+        this.aiFinder = new CSSmartAIElementFinder(driver);
+    }
+    
+    /**
+     * Find an element based on natural language description
+     */
+    public CSSmartWebElement findElement(String description, CSSmartBasePage currentPage) {
+        // First try to find by common identifiers in the description
+        CSSmartWebElement element = findByCommonIdentifiers(description);
+        if (element != null) {
+            return element;
+        }
+        
+        // Next, check if description matches any defined elements in the current page
+        if (currentPage != null) {
+            element = findInPageObject(description, currentPage);
+            if (element != null) {
+                return element;
+            }
+        }
+        
+        // Finally, use AI to find the element
+        return findWithAI(description);
+    }
+    
+    private CSSmartWebElement findByCommonIdentifiers(String description) {
+        // Extract any quoted strings which often indicate exact text or ID
+        Pattern quotePattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher matcher = quotePattern.matcher(description);
+        
+        if (matcher.find()) {
+            String quotedText = matcher.group(1);
+            
+            // Try finding by text
+            try {
+                WebElement element = driver.findElement(By.xpath("//*[text()='" + quotedText + "' or contains(text(),'" + quotedText + "')]"));
+                return new CSSmartWebElement(element, driver);
+            } catch (Exception e) {
+                // Continue to other methods
+            }
+            
+            // Try finding by ID, name, or other common attributes
+            List<String> commonAttributes = Arrays.asList("id", "name", "class", "title", "aria-label");
+            for (String attribute : commonAttributes) {
+                try {
+                    WebElement element = driver.findElement(By.cssSelector("[" + attribute + "='" + quotedText + "']"));
+                    return new CSSmartWebElement(element, driver);
+                } catch (Exception e) {
+                    // Continue to next attribute
+                }
+            }
+        }
+        
+        // Look for common element types in description
+        Map<String, By> commonElements = new HashMap<>();
+        commonElements.put("button", By.tagName("button"));
+        commonElements.put("link", By.tagName("a"));
+        commonElements.put("input", By.tagName("input"));
+        commonElements.put("dropdown", By.tagName("select"));
+        commonElements.put("checkbox", By.cssSelector("input[type='checkbox']"));
+        commonElements.put("radio", By.cssSelector("input[type='radio']"));
+        
+        for (Map.Entry<String, By> entry : commonElements.entrySet()) {
+            if (description.toLowerCase().contains(entry.getKey())) {
+                try {
+                    // If we find the element type, try to narrow down with any other text
+                    String otherText = description.replaceAll("\"[^\"]*\"", "")
+                                                  .replace(entry.getKey(), "")
+                                                  .trim();
+                    
+                    if (!otherText.isEmpty()) {
+                        WebElement element = driver.findElement(
+                            By.xpath("//" + entry.getKey() + 
+                                     "[contains(text(),'" + otherText + "') or " +
+                                     "contains(@id,'" + otherText + "') or " +
+                                     "contains(@name,'" + otherText + "') or " +
+                                     "contains(@class,'" + otherText + "')]"));
+                        return new CSSmartWebElement(element, driver);
+                    } else {
+                        // Just find by element type
+                        WebElement element = driver.findElement(entry.getValue());
+                        return new CSSmartWebElement(element, driver);
+                    }
+                } catch (Exception e) {
+                    // Continue to next method
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    private CSSmartWebElement findInPageObject(String description, CSSmartBasePage page) {
+        // This would use reflection to find elements in the page object 
+        // that match the description in their annotations or names
+        // Simplified implementation for demonstration
+        return page.findElementByDescription(description);
+    }
+    
+    private CSSmartWebElement findWithAI(String description) {
+        // Use the AI element finder for more complex descriptions
+        return aiFinder.findElementByDescription(description);
+    }
+}
+
+/**
+ * Maintains the state of test execution across steps
+ */
+class ContextManager {
+    private CSSmartBasePage currentPage;
+    private Map<String, Object> variables;
+    private CSSmartWebElement lastElement;
+    private boolean stopOnFailure;
+    
+    public ContextManager() {
+        this.variables = new HashMap<>();
+        this.stopOnFailure = true; // Default behavior
+    }
+    
+    public void resetContext() {
+        this.variables.clear();
+        this.lastElement = null;
+        // Don't reset currentPage as it persists across scenarios
+    }
+    
+    public void setCurrentPage(CSSmartBasePage page) {
+        this.currentPage = page;
+    }
+    
+    public CSSmartBasePage getCurrentPage() {
+        return currentPage;
+    }
+    
+    public void setVariable(String name, Object value) {
+        variables.put(name, value);
+    }
+    
+    public Object getVariable(String name) {
+        return variables.get(name);
+    }
+    
+    public void setLastElement(CSSmartWebElement element) {
+        this.lastElement = element;
+    }
+    
+    public CSSmartWebElement getLastElement() {
+        return lastElement;
+    }
+    
+    public void setStopOnFailure(boolean stop) {
+        this.stopOnFailure = stop;
+    }
+    
+    public boolean shouldStopOnFailure() {
+        return stopOnFailure;
+    }
+    
+    public void updateContext(ActionResult result) {
+        // Update context based on action results
+        if (result.getNewPage() != null) {
+            setCurrentPage(result.getNewPage());
+        }
+        
+        if (result.getElement() != null) {
+            setLastElement(result.getElement());
+        }
+        
+        // Store any extracted variables
+        if (result.getExtractedVariables() != null) {
+            result.getExtractedVariables().forEach(this::setVariable);
+        }
+    }
+}
+
+/**
+ * Processes natural language into structured components
+ */
+class NLPProcessor {
+    /**
+     * Analyzes a step text and extracts action, element description, and values
+     */
+    public NLPResult analyze(String stepText) {
+        NLPResult result = new NLPResult();
+        
+        // Remove the Given/When/Then/And prefix if present
+        String normalizedText = stripGherkinPrefix(stepText);
+        
+        // Extract quoted values (usually input data)
+        Pattern quotePattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher quoteMatcher = quotePattern.matcher(normalizedText);
+        
+        if (quoteMatcher.find()) {
+            result.setValue(quoteMatcher.group(1));
+            // Remove the quoted text to simplify further processing
+            normalizedText = normalizedText.replace("\"" + result.getValue() + "\"", "VALUE_PLACEHOLDER");
+        }
+        
+        // Identify action verbs
+        result.setAction(extractAction(normalizedText));
+        
+        // Extract element description
+        result.setElementDescription(extractElementDescription(normalizedText, result.getAction()));
+        
+        return result;
+    }
+    
+    private String stripGherkinPrefix(String text) {
+        String[] prefixes = {"Given ", "When ", "Then ", "And ", "But "};
+        for (String prefix : prefixes) {
+            if (text.startsWith(prefix)) {
+                return text.substring(prefix.length());
+            }
+        }
+        return text;
+    }
+    
+    private String extractAction(String text) {
+        // Common action verbs to look for
+        List<String> actionVerbs = Arrays.asList(
+            "click", "enter", "type", "select", "navigate to", "go to", "open",
+            "verify", "check", "should see", "wait for", "am on"
+        );
+        
+        for (String verb : actionVerbs) {
+            if (text.toLowerCase().contains(verb)) {
+                return verb;
+            }
+        }
+        
+        // Default - assume the first word is the action
+        String[] words = text.split(" ");
+        return words.length > 0 ? words[0] : "";
+    }
+    
+    private String extractElementDescription(String text, String action) {
+        // For most actions, the element description follows the action
+        if (action != null && !action.isEmpty()) {
+            // Get text after the action
+            int actionIndex = text.toLowerCase().indexOf(action.toLowerCase());
+            if (actionIndex >= 0) {
+                String afterAction = text.substring(actionIndex + action.length()).trim();
+                
+                // Handle special cases
+                if (afterAction.startsWith("on ") || afterAction.startsWith("the ")) {
+                    afterAction = afterAction.substring(afterAction.indexOf(" ") + 1);
+                }
+                
+                // Replace VALUE_PLACEHOLDER if it exists
+                afterAction = afterAction.replace("VALUE_PLACEHOLDER", "").trim();
+                
+                // Remove prepositional phrases that often come after element description
+                String[] prepositions = {"in ", "on ", "at ", "with "};
+                for (String prep : prepositions) {
+                    int prepIndex = afterAction.indexOf(" " + prep + " ");
+                    if (prepIndex > 0) {
+                        afterAction = afterAction.substring(0, prepIndex);
+                    }
+                }
+                
+                return afterAction;
+            }
+        }
+        
+        return null;
+    }
+}
+
+/**
+ * Result of NLP processing containing extracted components
+ */
+class NLPResult {
+    private String action;
+    private String elementDescription;
+    private String value;
+    
+    public String getAction() {
+        return action;
+    }
+    
+    public void setAction(String action) {
+        this.action = action;
+    }
+    
+    public String getElementDescription() {
+        return elementDescription;
+    }
+    
+    public void setElementDescription(String elementDescription) {
+        this.elementDescription = elementDescription;
+    }
+    
+    public String getValue() {
+        return value;
+    }
+    
+    public void setValue(String value) {
+        this.value = value;
+    }
+}
+
+/**
+ * Result of action execution with status and context updates
+ */
+class ActionResult {
+    private boolean success;
+    private String message;
+    private CSSmartWebElement element;
+    private CSSmartBasePage newPage;
+    private Map<String, Object> extractedVariables;
+    
+    public ActionResult(boolean success, String message) {
+        this.success = success;
+        this.message = message;
+        this.extractedVariables = new HashMap<>();
+    }
+    
+    public boolean isSuccess() {
+        return success;
+    }
+    
+    public String getMessage() {
+        return message;
+    }
+    
+    public CSSmartWebElement getElement() {
+        return element;
+    }
+    
+    public void setElement(CSSmartWebElement element) {
+        this.element = element;
+    }
+    
+    public CSSmartBasePage getNewPage() {
+        return newPage;
+    }
+    
+    public void setNewPage(CSSmartBasePage newPage) {
+        this.newPage = newPage;
+    }
+    
+    public Map<String, Object> getExtractedVariables() {
+        return extractedVariables;
+    }
+    
+    public void addExtractedVariable(String name, Object value) {
+        this.extractedVariables.put(name, value);
+    }
+}
+
+
+
+package com.cssmart.bdd;
+
+import com.cssmart.ai.interpreter.FeatureInterpreter;
+import com.cssmart.config.CSSmartConfig;
+import com.cssmart.config.PropertyManager;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.reporting.CSSmartReport;
+import org.testng.ITestContext;
+import org.testng.annotations.Factory;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Enhanced BDD Test Factory that supports AI-powered codeless testing
+ * This class detects when step definitions are missing and automatically
+ * switches to AI interpretation mode
+ */
+public class CSSmartBDDTestFactory {
+    
+    @Factory
+    public Object[] createTests(ITestContext context) {
+        CSSmartConfig config = PropertyManager.getConfig();
+        String featuresPath = config.getProperty("features.path", "src/test/resources/features");
+        String stepPackages = config.getProperty("steps.packages", "com.cssmart.test.steps");
+        
+        // Parse all feature files
+        List<CSSmartScenario> scenarios = parseFeatureFiles(featuresPath);
+        
+        // Check if step definitions exist
+        boolean hasStepDefinitions = hasStepDefinitions(stepPackages);
+        
+        // Create test instances
+        List<Object> tests = new ArrayList<>();
+        
+        if (hasStepDefinitions) {
+            // Traditional execution with step definitions
+            for (CSSmartScenario scenario : scenarios) {
+                tests.add(new CSSmartBDDTest(scenario, stepPackages));
+            }
+        } else {
+            // AI-powered codeless execution
+            for (CSSmartScenario scenario : scenarios) {
+                tests.add(new CSSmartAICodelessTest(scenario));
+            }
+        }
+        
+        return tests.toArray();
+    }
+    
+    /**
+     * Parse all feature files in the specified directory
+     */
+    private List<CSSmartScenario> parseFeatureFiles(String featuresPath) {
+        List<CSSmartScenario> scenarios = new ArrayList<>();
+        CSSmartBDDParser parser = new CSSmartBDDParser();
+        
+        File featuresDir = new File(featuresPath);
+        if (featuresDir.exists() && featuresDir.isDirectory()) {
+            File[] featureFiles = featuresDir.listFiles((dir, name) -> name.endsWith(".feature"));
+            if (featureFiles != null) {
+                for (File featureFile : featureFiles) {
+                    scenarios.addAll(parser.parseFeatureFile(featureFile.getAbsolutePath()));
+                }
+            }
+        }
+        
+        return scenarios;
+    }
+    
+    /**
+     * Check if step definitions exist for the specified packages
+     */
+    private boolean hasStepDefinitions(String stepPackages) {
+        CSSmartBDDScanner scanner = new CSSmartBDDScanner();
+        return scanner.scanStepDefinitions(stepPackages).size() > 0;
+    }
+}
+
+/**
+ * TestNG test class for AI-powered codeless test execution
+ */
+public class CSSmartAICodelessTest {
+    private final CSSmartScenario scenario;
+    private CSSmartDriver driver;
+    private FeatureInterpreter interpreter;
+    private CSSmartReport reporter;
+    
+    public CSSmartAICodelessTest(CSSmartScenario scenario) {
+        this.scenario = scenario;
+        this.reporter = CSSmartReport.getInstance();
+    }
+    
+    @org.testng.annotations.BeforeClass
+    public void setUp() {
+        reporter.logInfo("Setting up AI-powered codeless test for scenario: " + scenario.getName());
+        driver = new CSSmartDriver();
+        interpreter = new FeatureInterpreter(driver);
+    }
+    
+    @org.testng.annotations.Test
+    public void executeScenario() {
+        reporter.logInfo("Executing AI-powered codeless scenario: " + scenario.getName());
+        boolean success = interpreter.executeScenario(scenario);
+        org.testng.Assert.assertTrue(success, "Scenario failed: " + scenario.getName());
+    }
+    
+    @org.testng.annotations.AfterClass
+    public void tearDown() {
+        reporter.logInfo("Tearing down AI-powered codeless test for scenario: " + scenario.getName());
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+
+/**
+ * Enhanced BDD Parser with better text extraction for AI processing
+ */
+public class CSSmartBDDParser {
+    
+    /**
+     * Parse a feature file into a list of scenarios
+     */
+    public List<CSSmartScenario> parseFeatureFile(String filePath) {
+        List<CSSmartScenario> scenarios = new ArrayList<>();
+        
+        try {
+            List<String> lines = java.nio.file.Files.readAllLines(java.nio.file.Paths.get(filePath));
+            
+            String featureName = null;
+            CSSmartScenario currentScenario = null;
+            
+            for (String line : lines) {
+                line = line.trim();
+                
+                if (line.isEmpty() || line.startsWith("#")) {
+                    // Skip empty lines and comments
+                    continue;
+                }
+                
+                if (line.startsWith("Feature:")) {
+                    featureName = line.substring("Feature:".length()).trim();
+                } else if (line.startsWith("Scenario:") || line.startsWith("Scenario Outline:")) {
+                    // Complete previous scenario if any
+                    if (currentScenario != null) {
+                        scenarios.add(currentScenario);
+                    }
+                    
+                    // Start new scenario
+                    String scenarioName = line.substring(line.indexOf(":") + 1).trim();
+                    currentScenario = new CSSmartScenario(scenarioName, featureName);
+                } else if (line.startsWith("Given ") || line.startsWith("When ") || 
+                           line.startsWith("Then ") || line.startsWith("And ") || 
+                           line.startsWith("But ")) {
+                    // Add step to current scenario
+                    if (currentScenario != null) {
+                        CSSmartTestStep step = new CSSmartTestStep(line);
+                        currentScenario.addStep(step);
+                    }
+                } else if (line.startsWith("Examples:")) {
+                    // Handle example tables for scenario outlines
+                    // This would read the table and generate multiple scenarios
+                    // Simplified implementation for demonstration
+                }
+            }
+            
+            // Add last scenario
+            if (currentScenario != null) {
+                scenarios.add(currentScenario);
+            }
+            
+        } catch (Exception e) {
+            CSSmartReport.getInstance().logError("Error parsing feature file: " + e.getMessage());
+        }
+        
+        return scenarios;
+    }
+}
+
+
+{
+  "element-descriptions.json": {
+    "elements": [
+      {
+        "type": "button",
+        "descriptions": [
+          "A clickable control that triggers an action",
+          "Often has text indicating its purpose (e.g., 'Submit', 'Login', 'Cancel')",
+          "May have icons or be styled as a rectangle with rounded corners",
+          "Usually has hover effects and can be disabled"
+        ],
+        "common_attributes": ["type='button'", "role='button'", "class contains 'btn'"],
+        "common_text_patterns": ["Submit", "Login", "Sign In", "Register", "Cancel", "OK", "Save", "Delete", "Next", "Previous"],
+        "location_patterns": [
+          "At the bottom of forms",
+          "Next to input fields for search or filter actions",
+          "In header/navigation areas for user account actions",
+          "In modal dialogs for confirmation actions"
+        ]
+      },
+      {
+        "type": "text_input",
+        "descriptions": [
+          "A field where users can enter text data",
+          "Often has a label or placeholder text indicating required information",
+          "Usually rectangular with a visible border",
+          "May have validation states (error, success)"
+        ],
+        "common_attributes": ["type='text'", "type='email'", "type='password'", "role='textbox'"],
+        "common_id_patterns": ["email", "username", "name", "password", "search", "query"],
+        "adjacent_text_patterns": ["Email", "Username", "Password", "Name", "Address", "Phone", "Search"],
+        "location_patterns": [
+          "Within form elements",
+          "In search components at the top of pages",
+          "In login/registration areas"
+        ]
+      },
+      {
+        "type": "checkbox",
+        "descriptions": [
+          "A control that allows selecting multiple options",
+          "Square box that shows a check mark when selected",
+          "Often has a label describing the option"
+        ],
+        "common_attributes": ["type='checkbox'"],
+        "adjacent_text_patterns": ["Remember me", "Subscribe", "I agree", "Select all"],
+        "location_patterns": [
+          "In forms for boolean options",
+          "In settings pages",
+          "In multi-select lists"
+        ]
+      },
+      {
+        "type": "radio_button",
+        "descriptions": [
+          "A control for selecting one option from a group",
+          "Round button that shows a dot when selected",
+          "Always appears in groups"
+        ],
+        "common_attributes": ["type='radio'", "name"],
+        "location_patterns": [
+          "In forms for single-choice options",
+          "In survey questions",
+          "In settings with mutually exclusive options"
+        ]
+      },
+      {
+        "type": "dropdown",
+        "descriptions": [
+          "A control that provides a list of options when clicked",
+          "Usually has a down arrow indicator",
+          "Shows the currently selected option when closed"
+        ],
+        "common_attributes": ["role='combobox'", "tag='select'"],
+        "adjacent_text_patterns": ["Select", "Choose", "Filter by", "Sort by"],
+        "location_patterns": [
+          "In forms for selecting from predefined options",
+          "In filter controls",
+          "In navigation menus"
+        ]
+      },
+      {
+        "type": "link",
+        "descriptions": [
+          "Clickable text that navigates to another page",
+          "Often underlined or distinctly colored",
+          "May contain icon elements"
+        ],
+        "common_attributes": ["tag='a'", "href"],
+        "location_patterns": [
+          "In navigation menus",
+          "Within body content as references",
+          "In footer sections"
+        ]
+      },
+      {
+        "type": "image",
+        "descriptions": [
+          "Visual element displaying a picture",
+          "May be clickable (if also functioning as a link or button)",
+          "Can have different sizes and aspect ratios"
+        ],
+        "common_attributes": ["tag='img'", "src", "alt"],
+        "location_patterns": [
+          "In content areas",
+          "As logos in headers",
+          "In product listings",
+          "In carousels and galleries"
+        ]
+      },
+      {
+        "type": "table",
+        "descriptions": [
+          "Grid of data organized in rows and columns",
+          "May have headers for each column",
+          "Often contains tabular data"
+        ],
+        "common_attributes": ["tag='table'", "role='grid'"],
+        "location_patterns": [
+          "In data-heavy pages",
+          "In reporting sections",
+          "In pricing comparison sections"
+        ]
+      },
+      {
+        "type": "error_message",
+        "descriptions": [
+          "Text indicating a problem or error condition",
+          "Usually in red or with warning icons",
+          "Appears after form submission or validation"
+        ],
+        "common_attributes": ["class contains 'error'", "class contains 'alert'", "role='alert'"],
+        "common_text_patterns": ["Error", "Invalid", "Failed", "Required", "Please", "Not found"],
+        "location_patterns": [
+          "Near form fields with errors",
+          "At the top or bottom of forms",
+          "In modal dialogs for system errors"
+        ]
+      },
+      {
+        "type": "success_message",
+        "descriptions": [
+          "Text indicating successful completion of an action",
+          "Usually in green or with success icons",
+          "Appears after completing an action"
+        ],
+        "common_attributes": ["class contains 'success'", "role='status'"],
+        "common_text_patterns": ["Success", "Completed", "Thank you", "Confirmed", "Saved"],
+        "location_patterns": [
+          "At the top of pages after form submission",
+          "In modal dialogs after successful operations",
+          "Near the action button that was clicked"
+        ]
+      }
+    ]
+  },
+  "healing-patterns.json": {
+    "patterns": [
+      {
+        "category": "id_changes",
+        "description": "Patterns for healing when element IDs change",
+        "patterns": [
+          {
+            "original_pattern": "id='login-button'",
+            "healing_strategies": [
+              {
+                "strategy": "fuzzy_match",
+                "match_criteria": "id contains 'login'",
+                "confidence": 0.8
+              },
+              {
+                "strategy": "text_match",
+                "match_criteria": "text='Login' or text='Sign In'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "semantic_position",
+                "match_criteria": "button near password field",
+                "confidence": 0.6
+              }
+            ]
+          },
+          {
+            "original_pattern": "id='search-input'",
+            "healing_strategies": [
+              {
+                "strategy": "fuzzy_match",
+                "match_criteria": "id contains 'search'",
+                "confidence": 0.8
+              },
+              {
+                "strategy": "attribute_match",
+                "match_criteria": "placeholder contains 'search'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "semantic_position",
+                "match_criteria": "input in header with magnifying glass icon",
+                "confidence": 0.6
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category": "class_changes",
+        "description": "Patterns for healing when element classes change",
+        "patterns": [
+          {
+            "original_pattern": "class='btn-primary'",
+            "healing_strategies": [
+              {
+                "strategy": "fuzzy_match",
+                "match_criteria": "class contains 'btn'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "tag_match",
+                "match_criteria": "tag='button' and prominent position",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "visual_match",
+                "match_criteria": "primary color button with same size",
+                "confidence": 0.5
+              }
+            ]
+          },
+          {
+            "original_pattern": "class='form-control'",
+            "healing_strategies": [
+              {
+                "strategy": "fuzzy_match",
+                "match_criteria": "class contains 'form' or class contains 'input'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "tag_match",
+                "match_criteria": "tag='input' and in a form",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "label_match",
+                "match_criteria": "associated with same label text",
+                "confidence": 0.8
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category": "xpath_changes",
+        "description": "Patterns for healing when structure changes affect XPath",
+        "patterns": [
+          {
+            "original_pattern": "//div[3]/button[2]",
+            "healing_strategies": [
+              {
+                "strategy": "nearest_match",
+                "match_criteria": "button with similar text content",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "parent_match",
+                "match_criteria": "button in container with same role",
+                "confidence": 0.5
+              },
+              {
+                "strategy": "sibling_match",
+                "match_criteria": "button near elements with known IDs",
+                "confidence": 0.4
+              }
+            ]
+          },
+          {
+            "original_pattern": "//table/tbody/tr[5]/td[2]",
+            "healing_strategies": [
+              {
+                "strategy": "table_match",
+                "match_criteria": "cell with same header in table",
+                "confidence": 0.8
+              },
+              {
+                "strategy": "content_match",
+                "match_criteria": "cell with similar text pattern",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "position_match",
+                "match_criteria": "cell in similar relative position",
+                "confidence": 0.4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category": "text_changes",
+        "description": "Patterns for healing when text content changes",
+        "patterns": [
+          {
+            "original_pattern": "text()='Add to Cart'",
+            "healing_strategies": [
+              {
+                "strategy": "semantic_match",
+                "match_criteria": "text contains 'Cart' or text='Buy Now'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "position_match",
+                "match_criteria": "button near price information",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "icon_match",
+                "match_criteria": "button with shopping cart icon",
+                "confidence": 0.5
+              }
+            ]
+          },
+          {
+            "original_pattern": "text()='Submit'",
+            "healing_strategies": [
+              {
+                "strategy": "semantic_match",
+                "match_criteria": "text='Send' or text='Save' or text='OK'",
+                "confidence": 0.7
+              },
+              {
+                "strategy": "position_match",
+                "match_criteria": "button at bottom of form",
+                "confidence": 0.6
+              },
+              {
+                "strategy": "style_match",
+                "match_criteria": "primary action button in form",
+                "confidence": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "learning_rules": {
+      "success_threshold": 0.85,
+      "min_occurrences": 3,
+      "pattern_generalization": true,
+      "confidence_decay": 0.05,
+      "max_healing_attempts": 5
+    }
+  }
+}
+
+
+
+package com.cssmart.examples.codeless;
+
+import com.cssmart.ai.interpreter.FeatureInterpreter;
+import com.cssmart.bdd.CSSmartBDDParser;
+import com.cssmart.bdd.CSSmartScenario;
+import com.cssmart.driver.CSSmartDriver;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import java.util.List;
+
+/**
+ * Demonstrates how to use the AI-powered codeless testing framework
+ */
+public class CodelessTestingExample {
+    
+    private CSSmartDriver driver;
+    private FeatureInterpreter interpreter;
+    
+    @BeforeClass
+    public void setUp() {
+        // Initialize the driver and interpreter
+        driver = new CSSmartDriver();
+        interpreter = new FeatureInterpreter(driver);
+    }
+    
+    @Test
+    public void testLoginScenario() {
+        // You can directly run tests from feature files with no step definitions
+        String featureFilePath = "src/test/resources/features/login.feature";
+        
+        CSSmartBDDParser parser = new CSSmartBDDParser();
+        List<CSSmartScenario> scenarios = parser.parseFeatureFile(featureFilePath);
+        
+        Assert.assertFalse(scenarios.isEmpty(), "No scenarios found in feature file");
+        
+        // Get the login scenario
+        CSSmartScenario loginScenario = scenarios.get(0);
+        
+        // Execute the scenario using the AI interpreter
+        boolean result = interpreter.executeScenario(loginScenario);
+        
+        Assert.assertTrue(result, "Scenario execution failed");
+    }
+    
+    @AfterClass
+    public void tearDown() {
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+
+// Example feature file (src/test/resources/features/login.feature)
+/*
+Feature: Login Functionality
+
+Scenario: Successful login
+  Given I am on the login page
+  When I enter "username@example.com" in the email field
+  And I enter "password123" in the password field
+  And I click the "Sign In" button
+  Then I should see the dashboard
+
+Scenario: Failed login
+  Given I am on the login page
+  When I enter "invalid@example.com" in the email field
+  And I enter "wrong_password" in the password field
+  And I click the "Sign In" button
+  Then I should see an error message
+*/
+
+/**
+ * Example of running a test directly through the framework with TestNG
+ */
+public class RunCodelessTests {
+    
+    public static void main(String[] args) {
+        org.testng.TestNG testng = new org.testng.TestNG();
+        
+        // Create a list of all test classes to run
+        java.util.List<Class<?>> classes = new java.util.ArrayList<>();
+        classes.add(CodelessTestingExample.class);
+        
+        testng.setTestClasses(classes.toArray(new Class[0]));
+        testng.run();
+    }
+}
+
+/**
+ * Example of a complete end-to-end test without step definitions
+ */
+package com.cssmart.examples.e2e;
+
+import com.cssmart.ai.interpreter.FeatureInterpreter;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.reporting.CSSmartReport;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+/**
+ * End-to-end test example showing how to execute a complex
+ * scenario without writing any step definitions
+ */
+public class E2EShoppingCartTest {
+    
+    private CSSmartDriver driver;
+    private FeatureInterpreter interpreter;
+    
+    @BeforeClass
+    public void setUp() {
+        driver = new CSSmartDriver();
+        interpreter = new FeatureInterpreter(driver);
+        CSSmartReport.getInstance().startTest("E2E Shopping Cart Test");
+    }
+    
+    @Test
+    public void testShoppingCartCheckout() {
+        String[] steps = {
+            "Given I am on the homepage",
+            "When I search for \"smartphone\"",
+            "And I click on the first product",
+            "And I click the \"Add to Cart\" button",
+            "And I click the \"Cart\" icon",
+            "And I click the \"Proceed to Checkout\" button",
+            "And I enter \"John Doe\" in the name field",
+            "And I enter \"john@example.com\" in the email field",
+            "And I enter \"123 Main St\" in the address field",
+            "And I enter \"1234 5678 9012 3456\" in the credit card field",
+            "And I click the \"Complete Purchase\" button",
+            "Then I should see the order confirmation page",
+            "And I should see \"Thank you for your purchase\""
+        };
+        
+        boolean allPassed = true;
+        for (String step : steps) {
+            boolean stepResult = interpreter.interpretAndExecute(step);
+            if (!stepResult) {
+                allPassed = false;
+                break;
+            }
+        }
+        
+        org.testng.Assert.assertTrue(allPassed, "Not all steps passed");
+    }
+    
+    @AfterClass
+    public void tearDown() {
+        CSSmartReport.getInstance().endTest(true);
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+
+/**
+ * An example of a full TestNG XML file for running codeless tests
+ */
+/*
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Codeless Test Suite">
+  <test name="Codeless Tests">
+    <parameter name="browser" value="chrome"/>
+    <parameter name="featuresPath" value="src/test/resources/features"/>
+    <classes>
+      <class name="com.cssmart.bdd.CSSmartBDDTestFactory"/>
+    </classes>
+  </test>
+</suite>
+*/
+
+
+package com.cssmart.ai.visual;
+
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.element.CSSmartWebElement;
+import com.cssmart.reporting.CSSmartReport;
+import com.cssmart.utils.CSSmartScreenshot;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Provides visual recognition capabilities for finding elements
+ * when traditional locators fail
+ */
+public class VisualElementFinder {
+    private final CSSmartDriver driver;
+    private final CSSmartReport reporter;
+    private final Map<String, ElementVisualProfile> knownElementProfiles;
+    
+    public VisualElementFinder(CSSmartDriver driver) {
+        this.driver = driver;
+        this.reporter = CSSmartReport.getInstance();
+        this.knownElementProfiles = new HashMap<>();
+    }
+    
+    /**
+     * Find an element using visual recognition based on element description
+     * @param description Natural language description of the element
+     * @return The found element or null if not found
+     */
+    public CSSmartWebElement findElementByVisual(String description) {
+        reporter.logInfo("Attempting to find element visually: " + description);
+        
+        // Take a screenshot of the current page
+        byte[] screenshotBytes = driver.getScreenshotAs(org.openqa.selenium.OutputType.BYTES);
+        
+        try {
+            // Convert to BufferedImage for processing
+            BufferedImage screenshot = ImageIO.read(new ByteArrayInputStream(screenshotBytes));
+            
+            // Analyze the description to determine element type
+            ElementType elementType = determineElementType(description);
+            
+            // Get visual characteristics based on element type
+            List<Rectangle> potentialAreas = findPotentialElementAreas(screenshot, elementType);
+            
+            // Score each potential area against the description
+            List<ElementMatch> matches = scoreElementMatches(potentialAreas, description, screenshot);
+            
+            // Try to find the actual element corresponding to the best visual match
+            if (!matches.isEmpty()) {
+                ElementMatch bestMatch = matches.get(0);
+                return findCorrespondingElement(bestMatch.getBounds());
+            }
+            
+        } catch (IOException e) {
+            reporter.logError("Error processing screenshot: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Creates a visual profile for an element to help with future recognition
+     * @param element The element to profile
+     * @param description A description to associate with the element
+     */
+    public void createVisualProfile(CSSmartWebElement element, String description) {
+        try {
+            // Take screenshot of the element
+            byte[] elementScreenshot = element.getScreenshotAs(org.openqa.selenium.OutputType.BYTES);
+            BufferedImage elementImage = ImageIO.read(new ByteArrayInputStream(elementScreenshot));
+            
+            // Create a profile with visual characteristics
+            ElementVisualProfile profile = new ElementVisualProfile();
+            profile.setElementType(deriveElementType(element));
+            profile.setDescription(description);
+            profile.setImage(elementImage);
+            profile.setDimensions(element.getSize());
+            profile.setColorProfile(analyzeColors(elementImage));
+            profile.setTextContent(element.getText());
+            
+            // Store in known profiles
+            String profileId = generateProfileId(element, description);
+            knownElementProfiles.put(profileId, profile);
+            
+            // Save profile for future use
+            saveElementProfile(profile, profileId);
+            
+            reporter.logInfo("Created visual profile for element: " + description);
+        } catch (Exception e) {
+            reporter.logError("Failed to create visual profile: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Determine element type from description
+     */
+    private ElementType determineElementType(String description) {
+        String lowerDesc = description.toLowerCase();
+        
+        if (lowerDesc.contains("button")) {
+            return ElementType.BUTTON;
+        } else if (lowerDesc.contains("link")) {
+            return ElementType.LINK;
+        } else if (lowerDesc.contains("checkbox") || lowerDesc.contains("check box")) {
+            return ElementType.CHECKBOX;
+        } else if (lowerDesc.contains("radio")) {
+            return ElementType.RADIO;
+        } else if (lowerDesc.contains("dropdown") || lowerDesc.contains("select")) {
+            return ElementType.DROPDOWN;
+        } else if (lowerDesc.contains("input") || lowerDesc.contains("field") || 
+                   lowerDesc.contains("text box") || lowerDesc.contains("textbox")) {
+            return ElementType.INPUT;
+        } else if (lowerDesc.contains("image") || lowerDesc.contains("icon")) {
+            return ElementType.IMAGE;
+        }
+        
+        return ElementType.UNKNOWN;
+    }
+    
+    /**
+     * Find potential areas in the screenshot that might contain our target element
+     */
+    private List<Rectangle> findPotentialElementAreas(BufferedImage screenshot, ElementType elementType) {
+        List<Rectangle> potentialAreas = new ArrayList<>();
+        
+        // For demonstration, let's implement a simple algorithm
+        // In a real implementation, we would use more sophisticated image processing
+        
+        int width = screenshot.getWidth();
+        int height = screenshot.getHeight();
+        
+        // Simple edge detection to find rectangles
+        boolean[][] edges = detectEdges(screenshot);
+        
+        // Group edges into potential rectangles
+        List<Rectangle> allRectangles = findRectangles(edges, width, height);
+        
+        // Filter rectangles based on element type characteristics
+        for (Rectangle rect : allRectangles) {
+            if (matchesElementTypeCharacteristics(rect, screenshot, elementType)) {
+                potentialAreas.add(rect);
+            }
+        }
+        
+        return potentialAreas;
+    }
+    
+    /**
+     * Simple edge detection (placeholder implementation)
+     */
+    private boolean[][] detectEdges(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        boolean[][] edges = new boolean[width][height];
+        
+        // Simple implementation - in reality, would use proper edge detection algorithms
+        // like Sobel or Canny
+        
+        // Placeholder implementation
+        for (int x = 1; x < width - 1; x++) {
+            for (int y = 1; y < height - 1; y++) {
+                int rgb = image.getRGB(x, y);
+                int rgbLeft = image.getRGB(x - 1, y);
+                int rgbRight = image.getRGB(x + 1, y);
+                int rgbUp = image.getRGB(x, y - 1);
+                int rgbDown = image.getRGB(x, y + 1);
+                
+                // Simple edge detection by color difference
+                double threshold = 30.0;
+                if (colorDistance(rgb, rgbLeft) > threshold ||
+                    colorDistance(rgb, rgbRight) > threshold ||
+                    colorDistance(rgb, rgbUp) > threshold ||
+                    colorDistance(rgb, rgbDown) > threshold) {
+                    edges[x][y] = true;
+                }
+            }
+        }
+        
+        return edges;
+    }
+    
+    /**
+     * Calculate color distance between two RGB values
+     */
+    private double colorDistance(int rgb1, int rgb2) {
+        int r1 = (rgb1 >> 16) & 0xff;
+        int g1 = (rgb1 >> 8) & 0xff;
+        int b1 = rgb1 & 0xff;
+        
+        int r2 = (rgb2 >> 16) & 0xff;
+        int g2 = (rgb2 >> 8) & 0xff;
+        int b2 = rgb2 & 0xff;
+        
+        return Math.sqrt(Math.pow(r2 - r1, 2) + Math.pow(g2 - g1, 2) + Math.pow(b2 - b1, 2));
+    }
+    
+    /**
+     * Extract rectangles from edge data (simplified implementation)
+     */
+    private List<Rectangle> findRectangles(boolean[][] edges, int width, int height) {
+        List<Rectangle> rectangles = new ArrayList<>();
+        
+        // This is a placeholder for rectangle detection logic
+        // In a real implementation, we would use contour detection algorithms
+        
+        // Simplified implementation for demonstration
+        boolean[][] visited = new boolean[width][height];
+        
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (edges[x][y] && !visited[x][y]) {
+                    // Found start of a new edge group
+                    Rectangle bounds = traceEdgeGroup(edges, visited, x, y, width, height);
+                    if (bounds.width > 5 && bounds.height > 5) {
+                        rectangles.add(bounds);
+                    }
+                }
+            }
+        }
+        
+        return rectangles;
+    }
+    
+    /**
+     * Trace an edge group to find its bounding rectangle
+     */
+    private Rectangle traceEdgeGroup(boolean[][] edges, boolean[][] visited, 
+                                     int startX, int startY, int width, int height) {
+        int minX = startX;
+        int maxX = startX;
+        int minY = startY;
+        int maxY = startY;
+        
+        // Simple flood fill to find connected edge pixels
+        List<Point> queue = new ArrayList<>();
+        queue.add(new Point(startX, startY));
+        visited[startX][startY] = true;
+        
+        while (!queue.isEmpty()) {
+            Point p = queue.remove(0);
+            int x = p.x;
+            int y = p.y;
+            
+            // Update bounds
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+            
+            // Check neighbors
+            int[][] neighbors = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+            for (int[] offset : neighbors) {
+                int nx = x + offset[0];
+                int ny = y + offset[1];
+                
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height && 
+                    edges[nx][ny] && !visited[nx][ny]) {
+                    visited[nx][ny] = true;
+                    queue.add(new Point(nx, ny));
+                }
+            }
+        }
+        
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+    
+    /**
+     * Check if a rectangle matches the visual characteristics of the element type
+     */
+    private boolean matchesElementTypeCharacteristics(Rectangle rect, 
+                                                     BufferedImage screenshot, 
+                                                     ElementType elementType) {
+        // Extract the region of the screenshot
+        BufferedImage regionImage = screenshot.getSubimage(
+            rect.x, rect.y, rect.width, rect.height
+        );
+        
+        switch (elementType) {
+            case BUTTON:
+                return looksLikeButton(regionImage, rect);
+            case LINK:
+                return looksLikeLink(regionImage, rect);
+            case INPUT:
+                return looksLikeInput(regionImage, rect);
+            case CHECKBOX:
+                return looksLikeCheckbox(regionImage, rect);
+            case RADIO:
+                return looksLikeRadio(regionImage, rect);
+            case DROPDOWN:
+                return looksLikeDropdown(regionImage, rect);
+            case IMAGE:
+                return looksLikeImage(regionImage, rect);
+            default:
+                return true; // Accept all rectangles for unknown types
+        }
+    }
+    
+    /**
+     * Check if region looks like a button
+     */
+    private boolean looksLikeButton(BufferedImage region, Rectangle rect) {
+        // Buttons often have:
+        // 1. Rectangular shape with rounded corners
+        // 2. Consistent fill color
+        // 3. Text in the center
+        // 4. Width/height ratio between 2:1 and 5:1
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean goodRatio = ratio >= 1.0 && ratio <= 5.0;
+        
+        // Check if it has a consistent background color
+        boolean hasConsistentBackground = hasConsistentBackground(region);
+        
+        // Check if it has contrasting text
+        boolean hasContrastingText = hasContrastingText(region);
+        
+        return goodRatio && hasConsistentBackground && hasContrastingText;
+    }
+    
+    // Similar methods for other element types
+    private boolean looksLikeLink(BufferedImage region, Rectangle rect) {
+        // Links often have:
+        // 1. Text with consistent color (often blue)
+        // 2. May be underlined
+        // 3. Typically wider than tall
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean goodRatio = ratio >= 2.0; // Links are typically wider than tall
+        
+        // Check for typical link colors (blues)
+        boolean hasLinkColors = hasColorPredominance(region, new Color(0, 0, 255), 50);
+        
+        return goodRatio && hasLinkColors;
+    }
+    
+    private boolean looksLikeInput(BufferedImage region, Rectangle rect) {
+        // Input fields often have:
+        // 1. Rectangular shape with thin border
+        // 2. White/light background
+        // 3. Width/height ratio greater than 3:1
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean goodRatio = ratio >= 3.0;
+        
+        // Check for light background
+        boolean hasLightBackground = hasColorPredominance(region, Color.WHITE, 100);
+        
+        // Check for border
+        boolean hasBorder = hasBorder(region);
+        
+        return goodRatio && hasLightBackground && hasBorder;
+    }
+    
+    private boolean looksLikeCheckbox(BufferedImage region, Rectangle rect) {
+        // Checkboxes typically:
+        // 1. Are small and square
+        // 2. Have visible borders
+        // 3. May have a check mark inside
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean isSquarish = Math.abs(ratio - 1.0) < 0.2; // Close to square
+        boolean isSmall = rect.width < 30 && rect.height < 30; // Small size
+        
+        return isSquarish && isSmall;
+    }
+    
+    private boolean looksLikeRadio(BufferedImage region, Rectangle rect) {
+        // Radio buttons typically:
+        // 1. Are small and circular
+        // 2. Have visible borders
+        // 3. May have a dot inside
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean isCircular = Math.abs(ratio - 1.0) < 0.2; // Close to circle
+        boolean isSmall = rect.width < 30 && rect.height < 30; // Small size
+        
+        return isCircular && isSmall;
+    }
+    
+    private boolean looksLikeDropdown(BufferedImage region, Rectangle rect) {
+        // Dropdowns often have:
+        // 1. Rectangle shape with border
+        // 2. An arrow or triangle at the right edge
+        // 3. Width/height ratio greater than 3:1
+        
+        double ratio = (double) rect.width / rect.height;
+        boolean goodRatio = ratio >= 3.0;
+        
+        // Check for down arrow on the right
+        boolean hasArrow = hasDownArrowOnRight(region);
+        
+        return goodRatio && hasArrow;
+    }
+    
+    private boolean looksLikeImage(BufferedImage region, Rectangle rect) {
+        // Images typically have:
+        // 1. High color variance
+        // 2. No text-like patterns
+        
+        // Check for color variance
+        boolean hasColorVariance = !hasConsistentBackground(region);
+        
+        return hasColorVariance;
+    }
+    
+    /**
+     * Check if an image has a consistent background color
+     */
+    private boolean hasConsistentBackground(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        // Sample pixels to check for consistency
+        int sampleSize = Math.min(100, width * height);
+        int[] sampleColors = new int[sampleSize];
+        
+        for (int i = 0; i < sampleSize; i++) {
+            int x = (int) (Math.random() * width);
+            int y = (int) (Math.random() * height);
+            sampleColors[i] = image.getRGB(x, y);
+        }
+        
+        // Count color clusters
+        Map<Integer, Integer> colorClusters = new HashMap<>();
+        for (int color : sampleColors) {
+            // Group similar colors
+            boolean foundCluster = false;
+            for (int existingColor : colorClusters.keySet()) {
+                if (colorDistance(color, existingColor) < 30) {
+                    colorClusters.put(existingColor, colorClusters.get(existingColor) + 1);
+                    foundCluster = true;
+                    break;
+                }
+            }
+            
+            if (!foundCluster) {
+                colorClusters.put(color, 1);
+            }
+        }
+        
+        // If one color cluster dominates (>70%), consider it consistent
+        for (int count : colorClusters.values()) {
+            if (count > sampleSize * 0.7) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if an image has contrasting text
+     */
+    private boolean hasContrastingText(BufferedImage image) {
+        // Very simplified text detection (would be more complex in reality)
+        // Looking for horizontal lines of contrasting pixels
+        
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        // Get background color (assume it's the most common color)
+        Map<Integer, Integer> colorCounts = new HashMap<>();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int rgb = image.getRGB(x, y);
+                colorCounts.put(rgb, colorCounts.getOrDefault(rgb, 0) + 1);
+            }
+        }
+        
+        int backgroundColor = 0;
+        int maxCount = 0;
+        for (Map.Entry<Integer, Integer> entry : colorCounts.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+                backgroundColor = entry.getKey();
+            }
+        }
+        
+        // Look for horizontal lines with contrasting colors
+        int textLineCount = 0;
+        for (int y = 0; y < height; y++) {
+            int contrastingPixels = 0;
+            for (int x = 0; x < width; x++) {
+                int rgb = image.getRGB(x, y);
+                if (colorDistance(rgb, backgroundColor) > 50) {
+                    contrastingPixels++;
+                }
+            }
+            
+            // If more than 30% of the row has contrasting pixels, consider it text
+            if (contrastingPixels > width * 0.3) {
+                textLineCount++;
+            }
+        }
+        
+        // If at least a few rows have contrasting pixels, consider it contains text
+        return textLineCount >= 2;
+    }
+    
+    /**
+     * Check if a color is predominant in the image
+     */
+    private boolean hasColorPredominance(BufferedImage image, Color targetColor, int threshold) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        int count = 0;
+        int totalPixels = width * height;
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int rgb = image.getRGB(x, y);
+                if (colorDistance(rgb, targetColor.getRGB()) < threshold) {
+                    count++;
+                }
+            }
+        }
+        
+        return (double) count / totalPixels > 0.3; // If >30% pixels match the target color
+    }
+    
+    /**
+     * Check if image has a visible border
+     */
+    private boolean hasBorder(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        // Sample the edges of the image
+        List<Integer> edgeColors = new ArrayList<>();
+        
+        // Top and bottom edges
+        for (int x = 0; x < width; x++) {
+            edgeColors.add(image.getRGB(x, 0));
+            edgeColors.add(image.getRGB(x, height - 1));
+        }
+        
+        // Left and right edges
+        for (int y = 0; y < height; y++) {
+            edgeColors.add(image.getRGB(0, y));
+            edgeColors.add(image.getRGB(width - 1, y));
+        }
+        
+        // Check if edge colors are consistent and different from the center
+        int centerColor = image.getRGB(width / 2, height / 2);
+        
+        boolean consistentEdge = hasConsistentColors(edgeColors);
+        boolean differentFromCenter = false;
+        
+        if (consistentEdge) {
+            int edgeColor = edgeColors.get(0);
+            differentFromCenter = colorDistance(edgeColor, centerColor) > 30;
+        }
+        
+        return consistentEdge && differentFromCenter;
+    }
+    
+    /**
+     * Check if a list of colors is relatively consistent
+     */
+    private boolean hasConsistentColors(List<Integer> colors) {
+        if (colors.isEmpty()) {
+            return false;
+        }
+        
+        int referenceColor = colors.get(0);
+        int similarCount = 0;
+        
+        for (int color : colors) {
+            if (colorDistance(color, referenceColor) < 30) {
+                similarCount++;
+            }
+        }
+        
+        return (double) similarCount / colors.size() > 0.7; // >70% similar
+    }
+    
+    /**
+     * Check if image has a down arrow on the right side
+     */
+    private boolean hasDownArrowOnRight(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        
+        // Check the right quarter of the image for a down arrow pattern
+        int arrowRegionStartX = width * 3 / 4;
+        int arrowRegionWidth = width / 4;
+        
+        BufferedImage arrowRegion = image.getSubimage(
+            arrowRegionStartX, 0, arrowRegionWidth, height
+        );
+        
+        // Very simplified arrow detection
+        // In reality, would use pattern matching or more sophisticated techniques
+        
+        // Look for a triangle pattern (wider at top, narrower at bottom)
+        int[][] regionPixels = new int[arrowRegionWidth][height];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < arrowRegionWidth; x++) {
+                regionPixels[x][y] = arrowRegion.getRGB(x, y);
+            }
+        }
+        
+        // Get background color (assume it's the most common color)
+        Map<Integer, Integer> colorCounts = new HashMap<>();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < arrowRegionWidth; x++) {
+                colorCounts.put(regionPixels[x][y], 
+                               colorCounts.getOrDefault(regionPixels[x][y], 0) + 1);
+            }
+        }
+        
+        int backgroundColor = 0;
+        int maxCount = 0;
+        for (Map.Entry<Integer, Integer> entry : colorCounts.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+                backgroundColor = entry.getKey();
+            }
+        }
+        
+        // Check for arrow-like pattern (triangle pointing down)
+        boolean foundArrowPattern = false;
+        int midY = height / 2;
+        
+        // Look for wider at top, narrower at bottom pattern
+        int topWidth = countContrastingWidth(regionPixels, backgroundColor, midY - height/4);
+        int bottomWidth = countContrastingWidth(regionPixels, backgroundColor, midY + height/4);
+        
+        foundArrowPattern = topWidth > bottomWidth && bottomWidth > 0;
+        
+        return foundArrowPattern;
+    }
+    
+    /**
+     * Count width of contrasting pixels in a row
+     */
+    private int countContrastingWidth(int[][] pixels, int backgroundColor, int y) {
+        if (y < 0 || y >= pixels[0].length) {
+            return 0;
+        }
+        
+        int count = 0;
+        for (int x = 0; x < pixels.length; x++) {
+            if (colorDistance(pixels[x][y], backgroundColor) > 50) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
+     * Score element matches against the description
+     */
+    private List<ElementMatch> scoreElementMatches(List<Rectangle> potentialAreas, 
+                                                  String description,
+                                                  BufferedImage screenshot) {
+        List<ElementMatch> matches = new ArrayList<>();
+        
+        for (Rectangle area : potentialAreas) {
+            double score = scoreElementMatch(area, description, screenshot);
+            
+            if (score > 0.3) { // Minimum threshold
+                ElementMatch match = new ElementMatch();
+                match.setBounds(area);
+                match.setScore(score);
+                matches.add(match);
+            }
+        }
+        
+        // Sort by score in descending order
+        matches.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
+        
+        return matches;
+    }
+    
+    /**
+     * Score a single element match
+     */
+    private double scoreElementMatch(Rectangle area, String description, BufferedImage screenshot) {
+        // Score based on multiple factors
+        double score = 0.0;
+        
+        // 1. Size and position score
+        score += scorePositionAndSize(area, description);
+        
+        // 2. Visual characteristics score
+        score += scoreVisualCharacteristics(area, description, screenshot);
+        
+        // 3. Compare with known elements
+        score += scoreAgainstKnownElements(area, description, screenshot);
+        
+        return score;
+    }
+    
+    /**
+     * Score based on element position and size
+     */
+    private double scorePositionAndSize(Rectangle area, String description) {
+        double score = 0.0;
+        String lowerDesc = description.toLowerCase();
+        
+        // Position scoring
+        if (lowerDesc.contains("top") && area.y < 200) {
+            score += 0.1;
+        }
+        if (lowerDesc.contains("bottom") && area.y > 400) {
+            score += 0.1;
+        }
+        if (lowerDesc.contains("left") && area.x < 200) {
+            score += 0.1;
+        }
+        if (lowerDesc.contains("right") && area.x > 400) {
+            score += 0.1;
+        }
+        
+        // Size scoring
+        if (lowerDesc.contains("large") && area.width > 100 && area.height > 50) {
+            score += 0.1;
+        }
+        if (lowerDesc.contains("small") && area.width < 50 && area.height < 30) {
+            score += 0.1;
+        }
+        
+        return score;
+    }
+    
+    /**
+     * Score based on visual characteristics
+     */
+    private double scoreVisualCharacteristics(Rectangle area, String description, BufferedImage screenshot) {
+        double score = 0.0;
+        String lowerDesc = description.toLowerCase();
+        
+        try {
+            BufferedImage regionImage = screenshot.getSubimage(
+                area.x, area.y, area.width, area.height
+            );
+            
+            // Color scoring
+            if (lowerDesc.contains("blue")) {
+                if (hasColorPredominance(regionImage, Color.BLUE, 100)) {
+                    score += 0.2;
+                }
+            }
+            if (lowerDesc.contains("red")) {
+                if (hasColorPredominance(regionImage, Color.RED, 100)) {
+                    score += 0.2;
+                }
+            }
+            if (lowerDesc.contains("green")) {
+                if (hasColorPredominance(regionImage, Color.GREEN, 100)) {
+                    score += 0.2;
+                }
+            }
+            
+            // Text contrast scoring
+            if (lowerDesc.contains("text") || lowerDesc.contains("label") || 
+                lowerDesc.contains("button")) {
+                if (hasContrastingText(regionImage)) {
+                    score += 0.2;
+                }
+            }
+            
+            // Border scoring
+            if (lowerDesc.contains("border") || lowerDesc.contains("field") || 
+                lowerDesc.contains("input")) {
+                if (hasBorder(regionImage)) {
+                    score += 0.2;
+                }
+            }
+        } catch (Exception e) {
+            // Handle subimage errors
+        }
+        
+        return score;
+    }
+    
+    /**
+     * Score against known element profiles
+     */
+    private double scoreAgainstKnownElements(Rectangle area, String description, BufferedImage screenshot) {
+        double bestScore = 0.0;
+        
+        try {
+            BufferedImage regionImage = screenshot.getSubimage(
+                area.x, area.y, area.width, area.height
+            );
+            
+            for (ElementVisualProfile profile : knownElementProfiles.values()) {
+                double similarityScore = calculateVisualSimilarity(regionImage, profile);
+                double descriptionSimilarity = calculateDescriptionSimilarity(description, profile.getDescription());
+                
+                double combinedScore = 0.7 * similarityScore + 0.3 * descriptionSimilarity;
+                
+                if (combinedScore > bestScore) {
+                    bestScore = combinedScore;
+                }
+            }
+        } catch (Exception e) {
+            // Handle subimage errors
+        }
+        
+        return bestScore * 0.5; // Weight the known element score
+    }
+    
+    /**
+     * Calculate visual similarity between image and profile
+     */
+    private double calculateVisualSimilarity(BufferedImage image, ElementVisualProfile profile) {
+        // In a real implementation, would use image comparison algorithms
+        // Simplified implementation for demonstration
+        
+        // Compare size similarity
+        double sizeSimilarity = 1.0 - Math.abs(
+            (double) (image.getWidth() * image.getHeight()) / 
+            (profile.getDimensions().width * profile.getDimensions().height) - 1.0
+        );
+        
+        sizeSimilarity = Math.max(0.0, Math.min(1.0, sizeSimilarity));
+        
+        // Would also compare:
+        // - Color histograms
+        // - Edge patterns
+        // - Feature points
+        
+        return sizeSimilarity;
+    }
+    
+    /**
+     * Calculate similarity between descriptions
+     */
+    private double calculateDescriptionSimilarity(String desc1, String desc2) {
+        // Simple word overlap calculation
+        String[] words1 = desc1.toLowerCase().split("\\s+");
+        String[] words2 = desc2.toLowerCase().split("\\s+");
+        
+        int matches = 0;
+        for (String word1 : words1) {
+            for (String word2 : words2) {
+                if (word1.equals(word2) || word1.contains(word2) || word2.contains(word1)) {
+                    matches++;
+                    break;
+                }
+            }
+        }
+        
+        return (double) matches / Math.max(words1.length, words2.length);
+    }
+    
+    /**
+     * Find the actual WebElement corresponding to the visual match
+     */
+    private CSSmartWebElement findCorrespondingElement(Rectangle bounds) {
+        try {
+            // Get all elements in the page
+            List<WebElement> allElements = driver.findElements(By.xpath("//*"));
+            
+            // Find the element whose bounds most closely match our visual rectangle
+            WebElement bestMatch = null;
+            double bestOverlap = 0.0;
+            
+            for (WebElement element : allElements) {
+                try {
+                    org.openqa.selenium.Rectangle elemRect = element.getRect();
+                    Rectangle elementBounds = new Rectangle(
+                        elemRect.getX(), elemRect.getY(), 
+                        elemRect.getWidth(), elemRect.getHeight()
+                    );
+                    
+                    // Calculate overlap
+                    double overlap = calculateOverlap(bounds, elementBounds);
+                    
+                    if (overlap > bestOverlap) {
+                        bestOverlap = overlap;
+                        bestMatch = element;
+                    }
+                } catch (Exception e) {
+                    // Skip elements that throw exceptions
+                }
+            }
+            
+            if (bestMatch != null && bestOverlap > 0.5) { // Minimum 50% overlap
+                return new CSSmartWebElement(bestMatch, driver);
+            }
+        } catch (Exception e) {
+            reporter.logError("Error finding corresponding element: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Calculate overlap between two rectangles
+     */
+    private double calculateOverlap(Rectangle r1, Rectangle r2) {
+        int overlapX = Math.max(0, Math.min(r1.x + r1.width, r2.x + r2.width) - Math.max(r1.x, r2.x));
+        int overlapY = Math.max(0, Math.min(r1.y + r1.height, r2.y + r2.height) - Math.max(r1.y, r2.y));
+        
+        int overlapArea = overlapX * overlapY;
+        int r1Area = r1.width * r1.height;
+        int r2Area = r2.width * r2.height;
+        
+        // Intersection over Union (IoU)
+        return (double) overlapArea / (r1Area + r2Area - overlapArea);
+    }
+    
+    /**
+     * Infer element type from WebElement
+     */
+    private ElementType deriveElementType(CSSmartWebElement element) {
+        String tagName = element.getTagName().toLowerCase();
+        
+        switch (tagName) {
+            case "button":
+                return ElementType.BUTTON;
+            case "a":
+                return ElementType.LINK;
+            case "input":
+                String type = element.getAttribute("type");
+                if ("checkbox".equals(type)) return ElementType.CHECKBOX;
+                if ("radio".equals(type)) return ElementType.RADIO;
+                return ElementType.INPUT;
+            case "select":
+                return ElementType.DROPDOWN;
+            case "img":
+                return ElementType.IMAGE;
+            default:
+                // Check for common attributes/classes
+                if (element.getAttribute("role") != null) {
+                    String role = element.getAttribute("role");
+                    if ("button".equals(role)) return ElementType.BUTTON;
+                    if ("link".equals(role)) return ElementType.LINK;
+                    if ("checkbox".equals(role)) return ElementType.CHECKBOX;
+                    if ("radio".equals(role)) return ElementType.RADIO;
+                    if ("combobox".equals(role)) return ElementType.DROPDOWN;
+                    if ("img".equals(role)) return ElementType.IMAGE;
+                }
+                
+                return ElementType.UNKNOWN;
+        }
+    }
+    
+    /**
+     * Generate a unique profile ID
+     */
+    private String generateProfileId(CSSmartWebElement element, String description) {
+        String elementText = "";
+        try {
+            elementText = element.getText();
+        } catch (Exception e) {
+            // Ignore text extraction errors
+        }
+        
+        String elementType = element.getTagName();
+        String elementClass = element.getAttribute("class");
+        
+        return String.format("%s_%s_%s_%s", 
+            elementType,
+            elementClass.replace(" ", "_"),
+            elementText.replaceAll("[^a-zA-Z0-9]", "").substring(0, Math.min(10, elementText.length())),
+            description.replaceAll("[^a-zA-Z0-9]", "").substring(0, Math.min(10, description.length()))
+        );
+    }
+    
+    /**
+     * Save element profile for future use
+     */
+    private void saveElementProfile(ElementVisualProfile profile, String profileId) {
+        try {
+            // Create directory if it doesn't exist
+            File dir = new File("src/main/resources/visual-profiles");
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            
+            // Save the image
+            File imageFile = new File(dir, profileId + ".png");
+            ImageIO.write(profile.getImage(), "PNG", imageFile);
+            
+            // Save metadata
+            // In a real implementation, would save all profile data
+            // to be loaded on framework startup
+            
+        } catch (IOException e) {
+            reporter.logError("Failed to save visual profile: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Element types for visual recognition
+     */
+    public enum ElementType {
+        BUTTON,
+        LINK,
+        INPUT,
+        CHECKBOX,
+        RADIO,
+        DROPDOWN,
+        IMAGE,
+        UNKNOWN
+    }
+}
+
+/**
+ * Visual profile of an element for recognition
+ */
+class ElementVisualProfile {
+    private VisualElementFinder.ElementType elementType;
+    private String description;
+    private BufferedImage image;
+    private org.openqa.selenium.Dimension dimensions;
+    private Map<String, Object> colorProfile;
+    private String textContent;
+    
+    public VisualElementFinder.ElementType getElementType() {
+        return elementType;
+    }
+    
+    public void setElementType(VisualElementFinder.ElementType elementType) {
+        this.elementType = elementType;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    
+    public BufferedImage getImage() {
+        return image;
+    }
+    
+    public void setImage(BufferedImage image) {
+        this.image = image;
+    }
+    
+    public org.openqa.selenium.Dimension getDimensions() {
+        return dimensions;
+    }
+    
+    public void setDimensions(org.openqa.selenium.Dimension dimensions) {
+        this.dimensions = dimensions;
+    }
+    
+    public Map<String, Object> getColorProfile() {
+        return colorProfile;
+    }
+    
+    public void setColorProfile(Map<String, Object> colorProfile) {
+        this.colorProfile = colorProfile;
+    }
+    
+    public String getTextContent() {
+        return textContent;
+    }
+    
+    public void setTextContent(String textContent) {
+        this.textContent = textContent;
+    }
+}
+
+/**
+ * Analyze colors in an image and return a profile
+ */
+private Map<String, Object> analyzeColors(BufferedImage image) {
+    Map<String, Object> profile = new HashMap<>();
+    
+    int width = image.getWidth();
+    int height = image.getHeight();
+    
+    // Count colors
+    Map<Integer, Integer> colorCounts = new HashMap<>();
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int rgb = image.getRGB(x, y);
+            colorCounts.put(rgb, colorCounts.getOrDefault(rgb, 0) + 1);
+        }
+    }
+    
+    // Find dominant colors
+    List<Map.Entry<Integer, Integer>> sorted = new ArrayList<>(colorCounts.entrySet());
+    sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+    
+    // Store top colors
+    List<Map<String, Object>> dominantColors = new ArrayList<>();
+    int totalPixels = width * height;
+    
+    for (int i = 0; i < Math.min(5, sorted.size()); i++) {
+        Map.Entry<Integer, Integer> entry = sorted.get(i);
+        int rgb = entry.getKey();
+        int count = entry.getValue();
+        
+        Map<String, Object> colorInfo = new HashMap<>();
+        colorInfo.put("red", (rgb >> 16) & 0xff);
+        colorInfo.put("green", (rgb >> 8) & 0xff);
+        colorInfo.put("blue", rgb & 0xff);
+        colorInfo.put("percentage", (double) count / totalPixels);
+        
+        dominantColors.add(colorInfo);
+    }
+    
+    profile.put("dominantColors", dominantColors);
+    
+    // Calculate average brightness
+    long brightnessSum = 0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int rgb = image.getRGB(x, y);
+            int r = (rgb >> 16) & 0xff;
+            int g = (rgb >> 8) & 0xff;
+            int b = rgb & 0xff;
+            
+            // Simple brightness formula
+            int brightness = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+            brightnessSum += brightness;
+        }
+    }
+    
+    double avgBrightness = (double) brightnessSum / (width * height);
+    profile.put("averageBrightness", avgBrightness);
+    
+    return profile;
+}
+
+/**
+ * Represents a potential match between visual area and element
+ */
+class ElementMatch {
+    private Rectangle bounds;
+    private double score;
+    
+    public Rectangle getBounds() {
+        return bounds;
+    }
+    
+    public void setBounds(Rectangle bounds) {
+        this.bounds = bounds;
+    }
+    
+    public double getScore() {
+        return score;
+    }
+    
+    public void setScore(double score) {
+        this.score = score;
+    }
+}
+
+
+package com.cssmart.ai.nlp;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Advanced Natural Language Processing for interpreting test steps
+ * This component enhances the basic NLPProcessor with more sophisticated
+ * language understanding capabilities
+ */
+public class AdvancedNLPProcessor {
+    private final List<String> actionVerbs;
+    private final List<String> objectPrepositions;
+    private final Map<String, List<String>> synonymMap;
+    private final EntityRecognizer entityRecognizer;
+    private final RelationExtractor relationExtractor;
+    
+    public AdvancedNLPProcessor() {
+        this.actionVerbs = initializeActionVerbs();
+        this.objectPrepositions = initializeObjectPrepositions();
+        this.synonymMap = initializeSynonymMap();
+        this.entityRecognizer = new EntityRecognizer();
+        this.relationExtractor = new RelationExtractor();
+    }
+    
+    /**
+     * Analyze a test step with advanced NLP techniques
+     * @param stepText The text of the step
+     * @return A structured representation of the step
+     */
+    public NLPStepAnalysis analyzeStep(String stepText) {
+        // Remove Gherkin keywords
+        String normalizedText = stripGherkinPrefix(stepText);
+        
+        // Extract quoted values
+        Map<String, String> quotedValues = extractQuotedValues(normalizedText);
+        
+        // Replace quoted values with placeholders to simplify further processing
+        for (Map.Entry<String, String> entry : quotedValues.entrySet()) {
+            normalizedText = normalizedText.replace("\"" + entry.getValue() + "\"", entry.getKey());
+        }
+        
+        // Identify action verb
+        String actionVerb = identifyActionVerb(normalizedText);
+        
+        // Extract entities (elements, pages, etc.)
+        Map<String, String> entities = entityRecognizer.extractEntities(normalizedText);
+        
+        // Extract relations between entities
+        List<Relation> relations = relationExtractor.extractRelations(normalizedText, entities);
+        
+        // Create step analysis
+        NLPStepAnalysis analysis = new NLPStepAnalysis();
+        analysis.setOriginalText(stepText);
+        analysis.setNormalizedText(normalizedText);
+        analysis.setActionVerb(actionVerb);
+        analysis.setQuotedValues(quotedValues);
+        analysis.setEntities(entities);
+        analysis.setRelations(relations);
+        
+        // Determine primary object (the main element being acted upon)
+        analysis.setPrimaryObject(determinePrimaryObject(normalizedText, actionVerb, entities, relations));
+        
+        // Extract any secondary objects
+        analysis.setSecondaryObjects(extractSecondaryObjects(relations, analysis.getPrimaryObject()));
+        
+        // Determine target value (for input actions)
+        analysis.setTargetValue(determineTargetValue(quotedValues, actionVerb));
+        
+        // Extract location information
+        analysis.setLocationInfo(extractLocationInfo(normalizedText, entities, relations));
+        
+        return analysis;
+    }
+    
+    /**
+     * Generate action parameters based on the NLP analysis
+     * @param analysis The NLP analysis
+     * @return A map of parameter names to values
+     */
+    public Map<String, Object> generateActionParameters(NLPStepAnalysis analysis) {
+        Map<String, Object> params = new HashMap<>();
+        
+        // Primary element descriptor
+        if (analysis.getPrimaryObject() != null) {
+            params.put("elementDescription", analysis.getPrimaryObject());
+        }
+        
+        // Value to input or verify
+        if (analysis.getTargetValue() != null) {
+            params.put("value", analysis.getTargetValue());
+        }
+        
+        // URL for navigation
+        if (analysis.getLocationInfo() != null) {
+            params.put("url", analysis.getLocationInfo());
+        }
+        
+        // Expected conditions for verification
+        if (isVerificationAction(analysis.getActionVerb())) {
+            params.put("expectedCondition", deriveExpectedCondition(analysis));
+        }
+        
+        // Add any additional context from relations
+        for (Relation relation : analysis.getRelations()) {
+            if ("attribute".equals(relation.getType())) {
+                params.put("attribute_" + relation.getSource(), relation.getTarget());
+            }
+        }
+        
+        return params;
+    }
+    
+    private String stripGherkinPrefix(String text) {
+        String[] prefixes = {"Given ", "When ", "Then ", "And ", "But "};
+        for (String prefix : prefixes) {
+            if (text.startsWith(prefix)) {
+                return text.substring(prefix.length());
+            }
+        }
+        return text;
+    }
+    
+    private Map<String, String> extractQuotedValues(String text) {
+        Map<String, String> quotedValues = new HashMap<>();
+        Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(text);
+        
+        int valueCount = 0;
+        while (matcher.find()) {
+            String value = matcher.group(1);
+            String placeholder = "VALUE_" + valueCount++;
+            quotedValues.put(placeholder, value);
+        }
+        
+        return quotedValues;
+    }
+    
+    private String identifyActionVerb(String text) {
+        // Try to match known action verbs
+        for (String verb : actionVerbs) {
+            if (text.toLowerCase().contains(verb.toLowerCase())) {
+                return verb;
+            }
+        }
+        
+        // Check synonym map
+        for (Map.Entry<String, List<String>> entry : synonymMap.entrySet()) {
+            for (String synonym : entry.getValue()) {
+                if (text.toLowerCase().contains(synonym.toLowerCase())) {
+                    return entry.getKey(); // Return the canonical verb
+                }
+            }
+        }
+        
+        // Default to first word as verb if no match
+        String[] words = text.split("\\s+");
+        return words.length > 0 ? words[0].toLowerCase() : "";
+    }
+    
+    private String determinePrimaryObject(String text, String actionVerb, 
+                                         Map<String, String> entities,
+                                         List<Relation> relations) {
+        // Check if there's a direct object relation
+        for (Relation relation : relations) {
+            if ("direct_object".equals(relation.getType())) {
+                return relation.getTarget();
+            }
+        }
+        
+        // If no direct object relation, look for entities after the action verb
+        int verbIndex = text.toLowerCase().indexOf(actionVerb.toLowerCase());
+        if (verbIndex >= 0) {
+            String afterVerb = text.substring(verbIndex + actionVerb.length()).trim();
+            
+            // Look for phrases like "the login button" or "on the homepage"
+            for (String prep : objectPrepositions) {
+                if (afterVerb.startsWith(prep + " ")) {
+                    afterVerb = afterVerb.substring(prep.length()).trim();
+                    break;
+                }
+            }
+            
+            // Remove articles
+            afterVerb = afterVerb.replaceAll("^(the|a|an)\\s+", "");
+            
+            // If there's a preposition later in the text, cut off there
+            for (String prep : objectPrepositions) {
+                int prepIndex = afterVerb.indexOf(" " + prep + " ");
+                if (prepIndex > 0) {
+                    afterVerb = afterVerb.substring(0, prepIndex);
+                    break;
+                }
+            }
+            
+            // Now check if this matches any entity
+            for (Map.Entry<String, String> entry : entities.entrySet()) {
+                if (afterVerb.contains(entry.getValue())) {
+                    return entry.getValue();
+                }
+            }
+            
+            // If no entity match, return the text after verb
+            return afterVerb;
+        }
+        
+        return null;
+    }
+    
+    private List<String> extractSecondaryObjects(List<Relation> relations, String primaryObject) {
+        List<String> secondaryObjects = new ArrayList<>();
+        
+        for (Relation relation : relations) {
+            // Add objects that are related to the primary object but aren't the primary object
+            if (relation.getSource().equals(primaryObject) && 
+                !relation.getTarget().equals(primaryObject) &&
+                !secondaryObjects.contains(relation.getTarget())) {
+                
+                secondaryObjects.add(relation.getTarget());
+            }
+        }
+        
+        return secondaryObjects;
+    }
+    
+    private String determineTargetValue(Map<String, String> quotedValues, String actionVerb) {
+        // For input actions, the quoted value is typically the input value
+        if (isInputAction(actionVerb) && !quotedValues.isEmpty()) {
+            return quotedValues.values().iterator().next();
+        }
+        
+        return null;
+    }
+    
+    private String extractLocationInfo(String text, Map<String, String> entities, List<Relation> relations) {
+        // Check for location relations
+        for (Relation relation : relations) {
+            if ("location".equals(relation.getType())) {
+                return relation.getTarget();
+            }
+        }
+        
+        // Check for common navigation patterns
+        String lowerText = text.toLowerCase();
+        if (lowerText.contains("navigate to") || lowerText.contains("go to") || 
+            lowerText.contains("open") || lowerText.contains("on the")) {
+            
+            for (String entity : entities.values()) {
+                if (entity.toLowerCase().contains("page") || 
+                    entity.toLowerCase().contains("screen") ||
+                    entity.toLowerCase().contains("site") ||
+                    entity.toLowerCase().contains("website")) {
+                    
+                    return entity;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    private boolean isInputAction(String verb) {
+        return "enter".equals(verb) || "type".equals(verb) || 
+               "fill".equals(verb) || "input".equals(verb);
+    }
+    
+    private boolean isVerificationAction(String verb) {
+        return "verify".equals(verb) || "check".equals(verb) || 
+               "should see".equals(verb) || "should contain".equals(verb) ||
+               "should have".equals(verb);
+    }
+    
+    private String deriveExpectedCondition(NLPStepAnalysis analysis) {
+        String verb = analysis.getActionVerb();
+        
+        if ("should see".equals(verb)) {
+            return "visible";
+        } else if ("should contain".equals(verb)) {
+            return "text";
+        } else if ("should have".equals(verb)) {
+            // Check if there's an attribute relation
+            for (Relation relation : analysis.getRelations()) {
+                if ("attribute".equals(relation.getType())) {
+                    return "attribute";
+                }
+            }
+            return "property";
+        }
+        
+        return "visible"; // Default expected condition
+    }
+    
+    private List<String> initializeActionVerbs() {
+        return Arrays.asList(
+            // Navigation actions
+            "navigate to", "go to", "open", "am on",
+            
+            // Click actions
+            "click", "press", "select", "choose",
+            
+            // Input actions
+            "enter", "type", "fill", "input",
+            
+            // Verification actions
+            "verify", "check", "should see", "should contain", "should have",
+            
+            // Wait actions
+            "wait for", "wait until"
+        );
+    }
+    
+    private List<String> initializeObjectPrepositions() {
+        return Arrays.asList(
+            "on", "in", "at", "with", "using", "for", "to", "into", "through", "by"
+        );
+    }
+    
+    private Map<String, List<String>> initializeSynonymMap() {
+        Map<String, List<String>> map = new HashMap<>();
+        
+        // Click synonyms
+        map.put("click", Arrays.asList("tap", "press", "hit", "select", "choose"));
+        
+        // Enter synonyms
+        map.put("enter", Arrays.asList("type", "input", "fill", "populate", "put"));
+        
+        // Verify synonyms
+        map.put("verify", Arrays.asList("check", "confirm", "validate", "ensure", "assert"));
+        
+        // Navigate synonyms
+        map.put("navigate to", Arrays.asList("go to", "open", "visit", "browse to", "load", "access"));
+        
+        // Wait synonyms
+        map.put("wait for", Arrays.asList("wait until", "pause until", "wait while", "wait when"));
+        
+        return map;
+    }
+}
+
+/**
+ * Structured analysis of a test step
+ */
+class NLPStepAnalysis {
+    private String originalText;
+    private String normalizedText;
+    private String actionVerb;
+    private Map<String, String> quotedValues;
+    private Map<String, String> entities;
+    private List<Relation> relations;
+    private String primaryObject;
+    private List<String> secondaryObjects;
+    private String targetValue;
+    private String locationInfo;
+    
+    // Getters and setters
+    public String getOriginalText() {
+        return originalText;
+    }
+    
+    public void setOriginalText(String originalText) {
+        this.originalText = originalText;
+    }
+    
+    public String getNormalizedText() {
+        return normalizedText;
+    }
+    
+    public void setNormalizedText(String normalizedText) {
+        this.normalizedText = normalizedText;
+    }
+    
+    public String getActionVerb() {
+        return actionVerb;
+    }
+    
+    public void setActionVerb(String actionVerb) {
+        this.actionVerb = actionVerb;
+    }
+    
+    public Map<String, String> getQuotedValues() {
+        return quotedValues;
+    }
+    
+    public void setQuotedValues(Map<String, String> quotedValues) {
+        this.quotedValues = quotedValues;
+    }
+    
+    public Map<String, String> getEntities() {
+        return entities;
+    }
+    
+    public void setEntities(Map<String, String> entities) {
+        this.entities = entities;
+    }
+    
+    public List<Relation> getRelations() {
+        return relations;
+    }
+    
+    public void setRelations(List<Relation> relations) {
+        this.relations = relations;
+    }
+    
+    public String getPrimaryObject() {
+        return primaryObject;
+    }
+    
+    public void setPrimaryObject(String primaryObject) {
+        this.primaryObject = primaryObject;
+    }
+    
+    public List<String> getSecondaryObjects() {
+        return secondaryObjects;
+    }
+    
+    public void setSecondaryObjects(List<String> secondaryObjects) {
+        this.secondaryObjects = secondaryObjects;
+    }
+    
+    public String getTargetValue() {
+        return targetValue;
+    }
+    
+    public void setTargetValue(String targetValue) {
+        this.targetValue = targetValue;
+    }
+    
+    public String getLocationInfo() {
+        return locationInfo;
+    }
+    
+    public void setLocationInfo(String locationInfo) {
+        this.locationInfo = locationInfo;
+    }
+}
+
+/**
+ * Entity recognizer for identifying UI elements, pages, and other objects
+ */
+class EntityRecognizer {
+    private final Map<String, String> elementPatterns;
+    private final Map<String, String> pagePatterns;
+    
+    public EntityRecognizer() {
+        this.elementPatterns = initializeElementPatterns();
+        this.pagePatterns = initializePagePatterns();
+    }
+    
+    /**
+     * Extract entities from text
+     */
+    public Map<String, String> extractEntities(String text) {
+        Map<String, String> entities = new HashMap<>();
+        
+        // Extract UI elements
+        for (Map.Entry<String, String> entry : elementPatterns.entrySet()) {
+            Pattern pattern = Pattern.compile(entry.getValue(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(text);
+            
+            while (matcher.find()) {
+                String entity = matcher.group().trim();
+                entities.put("element_" + entities.size(), entity);
+            }
+        }
+        
+        // Extract pages/screens
+        for (Map.Entry<String, String> entry : pagePatterns.entrySet()) {
+            Pattern pattern = Pattern.compile(entry.getValue(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(text);
+            
+            while (matcher.find()) {
+                String entity = matcher.group().trim();
+                entities.put("page_" + entities.size(), entity);
+            }
+        }
+        
+        return entities;
+    }
+    
+    private Map<String, String> initializeElementPatterns() {
+        Map<String, String> patterns = new HashMap<>();
+        
+        // Button patterns
+        patterns.put("button", "(the\\s+)?(\\w+\\s+)?(submit|login|logout|sign in|sign out|cancel|ok|save|delete|next|previous|search|filter|apply|reset|clear|add|remove|update|create|send|upload|download|confirm)\\s+button");
+        
+        // Input field patterns
+        patterns.put("input", "(the\\s+)?(\\w+\\s+)?(username|email|password|search|name|address|phone|date|time|number|text|comment|message|subject)\\s+(field|input|box|area)");
+        
+        // Link patterns
+        patterns.put("link", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+link");
+        
+        // Checkbox patterns
+        patterns.put("checkbox", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+(checkbox|check box)");
+        
+        // Radio button patterns
+        patterns.put("radio", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+(radio|radio button|option)");
+        
+        // Dropdown patterns
+        patterns.put("dropdown", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+(dropdown|drop-down|select|combobox|combo box)");
+        
+        // Icon patterns
+        patterns.put("icon", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+icon");
+        
+        // Generic element patterns
+        patterns.put("element", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+(element|component|control|widget)");
+        
+        return patterns;
+    }
+    
+    private Map<String, String> initializePagePatterns() {
+        Map<String, String> patterns = new HashMap<>();
+        
+        // Page patterns
+        patterns.put("page", "(the\\s+)?(\\w+\\s+)?(home|login|signup|register|account|profile|settings|dashboard|admin|user|product|cart|checkout|payment|confirmation|search|results|details|summary|error|success)\\s+(page|screen|view)");
+        
+        // Website patterns
+        patterns.put("site", "(the\\s+)?(\\w+\\s+)?(\\w+)\\s+(site|website|application|app)");
+        
+        return patterns;
+    }
+}
+
+/**
+ * Relation between entities in the step text
+ */
+class Relation {
+    private String source;
+    private String target;
+    private String type;
+    
+    public Relation(String source, String target, String type) {
+        this.source = source;
+        this.target = target;
+        this.type = type;
+    }
+    
+    public String getSource() {
+        return source;
+    }
+    
+    public String getTarget() {
+        return target;
+    }
+    
+    public String getType() {
+        return type;
+    }
+}
+
+/**
+ * Extracts relations between entities in the step text
+ */
+class RelationExtractor {
+    private final List<RelationPattern> relationPatterns;
+    
+    public RelationExtractor() {
+        this.relationPatterns = initializeRelationPatterns();
+    }
+    
+    /**
+     * Extract relations between entities in the text
+     */
+    public List<Relation> extractRelations(String text, Map<String, String> entities) {
+        List<Relation> relations = new ArrayList<>();
+        
+        // Apply each relation pattern
+        for (RelationPattern pattern : relationPatterns) {
+            Pattern regex = Pattern.compile(pattern.getRegexPattern(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = regex.matcher(text);
+            
+            while (matcher.find()) {
+                try {
+                    String source = matcher.group(pattern.getSourceGroup()).trim();
+                    String target = matcher.group
+
+
+                    // Continuing from where we left off in nlp-enhancements.java:
+
+    public List<Relation> extractRelations(String text, Map<String, String> entities) {
+        List<Relation> relations = new ArrayList<>();
+        
+        // Apply each relation pattern
+        for (RelationPattern pattern : relationPatterns) {
+            Pattern regex = Pattern.compile(pattern.getRegexPattern(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = regex.matcher(text);
+            
+            while (matcher.find()) {
+                try {
+                    String source = matcher.group(pattern.getSourceGroup()).trim();
+                    String target = matcher.group(pattern.getTargetGroup()).trim();
+                    
+                    // Find the most similar entity for source and target
+                    String sourceEntity = findMostSimilarEntity(source, entities);
+                    String targetEntity = findMostSimilarEntity(target, entities);
+                    
+                    if (sourceEntity != null && targetEntity != null) {
+                        relations.add(new Relation(sourceEntity, targetEntity, pattern.getRelationType()));
+                    }
+                } catch (Exception e) {
+                    // Skip this match if groups are missing
+                }
+            }
+        }
+        
+        // Also try to infer direct object relations based on action verbs
+        inferDirectObjectRelations(text, entities, relations);
+        
+        return relations;
+    }
+    
+    /**
+     * Find the most similar entity to the extracted text
+     */
+    private String findMostSimilarEntity(String text, Map<String, String> entities) {
+        String bestMatch = null;
+        double bestScore = 0.0;
+        
+        for (String entity : entities.values()) {
+            double score = calculateSimilarity(text, entity);
+            
+            if (score > bestScore && score > 0.5) { // Minimum threshold
+                bestScore = score;
+                bestMatch = entity;
+            }
+        }
+        
+        return bestMatch;
+    }
+    
+    /**
+     * Calculate similarity between two strings
+     */
+    private double calculateSimilarity(String s1, String s2) {
+        // Simple word overlap calculation
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        
+        if (s1.contains(s2) || s2.contains(s1)) {
+            return 0.9; // Strong match if one contains the other
+        }
+        
+        String[] words1 = s1.split("\\s+");
+        String[] words2 = s2.split("\\s+");
+        
+        int matches = 0;
+        for (String word1 : words1) {
+            for (String word2 : words2) {
+                if (word1.equals(word2) || word1.contains(word2) || word2.contains(word1)) {
+                    matches++;
+                    break;
+                }
+            }
+        }
+        
+        return (double) matches / Math.max(words1.length, words2.length);
+    }
+    
+    /**
+     * Infer direct object relations based on action verbs
+     */
+    private void inferDirectObjectRelations(String text, Map<String, String> entities, List<Relation> relations) {
+        // Common action verbs and their direct object patterns
+        Map<String, String> verbPatterns = new HashMap<>();
+        verbPatterns.put("click", "(click\\s+(?:on\\s+)?)(the\\s+)?([\\w\\s]+)");
+        verbPatterns.put("enter", "(enter\\s+)([^\"]+)(\\s+in(?:to)?\\s+)(the\\s+)?([\\w\\s]+)");
+        verbPatterns.put("verify", "(verify\\s+(?:that\\s+)?)(the\\s+)?([\\w\\s]+)");
+        
+        for (Map.Entry<String, String> entry : verbPatterns.entrySet()) {
+            Pattern pattern = Pattern.compile(entry.getValue(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(text);
+            
+            while (matcher.find()) {
+                try {
+                    String verb = entry.getKey();
+                    String object = null;
+                    
+                    if (verb.equals("click") && matcher.groupCount() >= 3) {
+                        object = matcher.group(3).trim();
+                    } else if (verb.equals("enter") && matcher.groupCount() >= 5) {
+                        object = matcher.group(5).trim();
+                    } else if (verb.equals("verify") && matcher.groupCount() >= 3) {
+                        object = matcher.group(3).trim();
+                    }
+                    
+                    if (object != null) {
+                        String objectEntity = findMostSimilarEntity(object, entities);
+                        if (objectEntity != null) {
+                            relations.add(new Relation(verb, objectEntity, "direct_object"));
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip this match if there's an error
+                }
+            }
+        }
+    }
+    
+    /**
+     * Initialize relation patterns to extract from text
+     */
+    private List<RelationPattern> initializeRelationPatterns() {
+        List<RelationPattern> patterns = new ArrayList<>();
+        
+        // Direct object relations
+        patterns.add(new RelationPattern(
+            "(click|press|select|choose)\\s+(?:on\\s+)?(the\\s+)?([\\w\\s]+)",
+            3, 3, "direct_object"
+        ));
+        
+        patterns.add(new RelationPattern(
+            "(enter|type|fill|input)\\s+\"[^\"]+\"\\s+(?:in|into|to)\\s+(the\\s+)?([\\w\\s]+)",
+            1, 3, "direct_object"
+        ));
+        
+        // Location relations
+        patterns.add(new RelationPattern(
+            "(navigate|go)\\s+to\\s+(the\\s+)?([\\w\\s]+)",
+            1, 3, "location"
+        ));
+        
+        patterns.add(new RelationPattern(
+            "(am|be)\\s+on\\s+(the\\s+)?([\\w\\s]+)",
+            1, 3, "location"
+        ));
+        
+        // Attribute relations
+        patterns.add(new RelationPattern(
+            "(the\\s+)?([\\w\\s]+)\\s+(?:should\\s+have|has|with)\\s+(the\\s+)?([\\w\\s]+)\\s+(?:of|equal\\s+to|containing)\\s+\"([^\"]+)\"",
+            2, 4, "attribute"
+        ));
+        
+        // Containment relations
+        patterns.add(new RelationPattern(
+            "(the\\s+)?([\\w\\s]+)\\s+(?:contains|should\\s+contain|has)\\s+(the\\s+)?([\\w\\s]+)",
+            2, 4, "contains"
+        ));
+        
+        // Spatial relations
+        patterns.add(new RelationPattern(
+            "(the\\s+)?([\\w\\s]+)\\s+(?:is|appears)\\s+(?:above|below|next\\s+to|near|beside)\\s+(the\\s+)?([\\w\\s]+)",
+            2, 4, "spatial"
+        ));
+        
+        return patterns;
+    }
+}
+
+/**
+ * Defines a relation pattern to extract from text
+ */
+class RelationPattern {
+    private String regexPattern;
+    private int sourceGroup;
+    private int targetGroup;
+    private String relationType;
+    
+    public RelationPattern(String regexPattern, int sourceGroup, int targetGroup, String relationType) {
+        this.regexPattern = regexPattern;
+        this.sourceGroup = sourceGroup;
+        this.targetGroup = targetGroup;
+        this.relationType = relationType;
+    }
+    
+    public String getRegexPattern() {
+        return regexPattern;
+    }
+    
+    public int getSourceGroup() {
+        return sourceGroup;
+    }
+    
+    public int getTargetGroup() {
+        return targetGroup;
+    }
+    
+    public String getRelationType() {
+        return relationType;
+    }
+}
+
+package com.cssmart.ai.context;
+
+import com.cssmart.ai.nlp.AdvancedNLPProcessor;
+import com.cssmart.ai.nlp.NLPStepAnalysis;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.element.CSSmartWebElement;
+import com.cssmart.reporting.CSSmartReport;
+import com.cssmart.ui.CSSmartBasePage;
+
+import java.util.*;
+
+/**
+ * Manages and maintains context during test execution to handle relative references
+ * and maintain state between steps.
+ */
+public class ContextAwareStepProcessor {
+    private final CSSmartDriver driver;
+    private final AdvancedNLPProcessor nlpProcessor;
+    private final CSSmartReport reporter;
+    
+    private CSSmartBasePage currentPage;
+    private Map<String, CSSmartWebElement> knownElements;
+    private Map<String, Object> variables;
+    private CSSmartWebElement lastElement;
+    private List<String> executedSteps;
+    private Map<String, ReferenceTracker> referenceTrackers;
+    
+    public ContextAwareStepProcessor(CSSmartDriver driver) {
+        this.driver = driver;
+        this.nlpProcessor = new AdvancedNLPProcessor();
+        this.reporter = CSSmartReport.getInstance();
+        this.knownElements = new HashMap<>();
+        this.variables = new HashMap<>();
+        this.executedSteps = new ArrayList<>();
+        this.referenceTrackers = new HashMap<>();
+        initializeReferenceTrackers();
+    }
+    
+    /**
+     * Process a step with context awareness
+     * @param stepText The step text
+     * @return Parameters for action execution
+     */
+    public Map<String, Object> processStep(String stepText) {
+        reporter.logInfo("Processing step with context awareness: " + stepText);
+        
+        // Add step to execution history
+        executedSteps.add(stepText);
+        
+        // Analyze step with NLP
+        NLPStepAnalysis analysis = nlpProcessor.analyzeStep(stepText);
+        
+        // Resolve relative references
+        resolveRelativeReferences(analysis);
+        
+        // Update trackers with new information from this step
+        updateReferenceTrackers(analysis);
+        
+        // Generate action parameters
+        Map<String, Object> actionParams = nlpProcessor.generateActionParameters(analysis);
+        
+        // Enhance with context information
+        enhanceWithContextInformation(actionParams, analysis);
+        
+        return actionParams;
+    }
+    
+    /**
+     * Reset context for a new test/scenario
+     */
+    public void resetContext() {
+        knownElements.clear();
+        variables.clear();
+        lastElement = null;
+        executedSteps.clear();
+        
+        for (ReferenceTracker tracker : referenceTrackers.values()) {
+            tracker.reset();
+        }
+    }
+    
+    /**
+     * Set the current page context
+     */
+    public void setCurrentPage(CSSmartBasePage page) {
+        this.currentPage = page;
+    }
+    
+    /**
+     * Get the current page context
+     */
+    public CSSmartBasePage getCurrentPage() {
+        return currentPage;
+    }
+    
+    /**
+     * Record a known element for future reference
+     */
+    public void recordElement(String reference, CSSmartWebElement element) {
+        knownElements.put(reference.toLowerCase(), element);
+        lastElement = element;
+    }
+    
+    /**
+     * Store a variable for future reference
+     */
+    public void storeVariable(String name, Object value) {
+        variables.put(name, value);
+    }
+    
+    /**
+     * Get a stored variable
+     */
+    public Object getVariable(String name) {
+        return variables.get(name);
+    }
+    
+    /**
+     * Initialize reference trackers for different types of references
+     */
+    private void initializeReferenceTrackers() {
+        // Track relative positional references (it, above, below, etc.)
+        referenceTrackers.put("positional", new PositionalReferenceTracker());
+        
+        // Track element references for later retrieval
+        referenceTrackers.put("element", new ElementReferenceTracker());
+        
+        // Track form field references for field navigation
+        referenceTrackers.put("form", new FormReferenceTracker());
+        
+        // Track page context for navigation understanding
+        referenceTrackers.put("page", new PageReferenceTracker());
+    }
+    
+    /**
+     * Resolve relative references in the step analysis
+     */
+    private void resolveRelativeReferences(NLPStepAnalysis analysis) {
+        String primaryObject = analysis.getPrimaryObject();
+        
+        if (primaryObject == null) {
+            return;
+        }
+        
+        // Check for pronouns and relative references
+        if (isRelativeReference(primaryObject)) {
+            String resolvedReference = resolveRelativeReference(primaryObject, analysis);
+            
+            if (resolvedReference != null) {
+                analysis.setPrimaryObject(resolvedReference);
+            }
+        }
+        
+        // Resolve secondary objects if needed
+        List<String> secondaryObjects = analysis.getSecondaryObjects();
+        if (secondaryObjects != null) {
+            for (int i = 0; i < secondaryObjects.size(); i++) {
+                String secondaryObject = secondaryObjects.get(i);
+                
+                if (isRelativeReference(secondaryObject)) {
+                    String resolvedReference = resolveRelativeReference(secondaryObject, analysis);
+                    
+                    if (resolvedReference != null) {
+                        secondaryObjects.set(i, resolvedReference);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Check if a string contains a relative reference
+     */
+    private boolean isRelativeReference(String text) {
+        if (text == null) {
+            return false;
+        }
+        
+        String lowerText = text.toLowerCase();
+        
+        // Common pronouns and relative references
+        String[] relativeRefs = {"it", "this", "that", "them", "those", "these", 
+                                "the same", "previous", "above", "below", "next"};
+        
+        for (String ref : relativeRefs) {
+            if (lowerText.equals(ref) || lowerText.contains(" " + ref + " ")) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Resolve a relative reference using context
+     */
+    private String resolveRelativeReference(String reference, NLPStepAnalysis analysis) {
+        String lowerRef = reference.toLowerCase();
+        
+        // Try all trackers for resolution
+        for (ReferenceTracker tracker : referenceTrackers.values()) {
+            String resolved = tracker.resolveReference(lowerRef, analysis, this);
+            
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        
+        // Fall back to last element if we can't resolve otherwise
+        if (lastElement != null) {
+            try {
+                String elementText = lastElement.getText();
+                if (elementText != null && !elementText.isEmpty()) {
+                    return elementText + " element";
+                } else {
+                    String tagName = lastElement.getTagName();
+                    return "the " + tagName + " element";
+                }
+            } catch (Exception e) {
+                // If we can't get text or tag, fall back to generic description
+                return "the previously used element";
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Update all reference trackers with new information from this step
+     */
+    private void updateReferenceTrackers(NLPStepAnalysis analysis) {
+        for (ReferenceTracker tracker : referenceTrackers.values()) {
+            tracker.updateFromStep(analysis, this);
+        }
+    }
+    
+    /**
+     * Enhance action parameters with context information
+     */
+    private void enhanceWithContextInformation(Map<String, Object> actionParams, 
+                                              NLPStepAnalysis analysis) {
+        // Add current page information if available
+        if (currentPage != null) {
+            actionParams.put("currentPage", currentPage);
+        }
+        
+        // Add previously known elements that might be relevant
+        if (!knownElements.isEmpty() && analysis.getPrimaryObject() != null) {
+            String primaryObject = analysis.getPrimaryObject().toLowerCase();
+            
+            for (Map.Entry<String, CSSmartWebElement> entry : knownElements.entrySet()) {
+                String key = entry.getKey();
+                double similarity = calculateSimilarity(primaryObject, key);
+                
+                // If reference is similar to a known element, include it
+                if (similarity > 0.7) {
+                    actionParams.put("knownElement", entry.getValue());
+                    break;
+                }
+            }
+        }
+        
+        // Add relevant variables
+        if (analysis.getTargetValue() != null) {
+            String targetValue = analysis.getTargetValue();
+            
+            // Check if the value is actually a variable reference
+            if (targetValue.startsWith("$") && variables.containsKey(targetValue.substring(1))) {
+                // Replace with actual variable value
+                actionParams.put("value", variables.get(targetValue.substring(1)));
+            }
+        }
+    }
+    
+    /**
+     * Calculate similarity between two strings
+     */
+    private double calculateSimilarity(String s1, String s2) {
+        if (s1 == null || s2 == null) {
+            return 0.0;
+        }
+        
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        
+        if (s1.contains(s2) || s2.contains(s1)) {
+            return 0.9;
+        }
+        
+        String[] words1 = s1.split("\\s+");
+        String[] words2 = s2.split("\\s+");
+        
+        int matches = 0;
+        for (String word1 : words1) {
+            for (String word2 : words2) {
+                if (word1.equals(word2) || word1.contains(word2) || word2.contains(word1)) {
+                    matches++;
+                    break;
+                }
+            }
+        }
+        
+        return (double) matches / Math.max(words1.length, words2.length);
+    }
+}
+
+/**
+ * Interface for reference tracking and resolution
+ */
+interface ReferenceTracker {
+    /**
+     * Resolve a reference using context
+     */
+    String resolveReference(String reference, NLPStepAnalysis currentStep, 
+                           ContextAwareStepProcessor context);
+    
+    /**
+     * Update internal state from a step
+     */
+    void updateFromStep(NLPStepAnalysis step, ContextAwareStepProcessor context);
+    
+    /**
+     * Reset tracker state
+     */
+    void reset();
+}
+
+/**
+ * Tracks positional references like "it", "above", "below"
+ */
+class PositionalReferenceTracker implements ReferenceTracker {
+    private String lastMentionedElement;
+    private Map<String, List<String>> spatialRelations;
+    
+    public PositionalReferenceTracker() {
+        this.spatialRelations = new HashMap<>();
+    }
+    
+    @Override
+    public String resolveReference(String reference, NLPStepAnalysis currentStep, 
+                                  ContextAwareStepProcessor context) {
+        // Handle pronouns like "it", "this", "that"
+        if (reference.equals("it") || reference.equals("this") || 
+            reference.equals("that") || reference.equals("the element")) {
+            return lastMentionedElement;
+        }
+        
+        // Handle positional references like "above", "below", "next to"
+        for (Map.Entry<String, List<String>> entry : spatialRelations.entrySet()) {
+            if (reference.contains("above " + entry.getKey())) {
+                return getElementAbove(entry.getKey());
+            } else if (reference.contains("below " + entry.getKey())) {
+                return getElementBelow(entry.getKey());
+            } else if (reference.contains("next to " + entry.getKey()) || 
+                       reference.contains("beside " + entry.getKey())) {
+                return getElementNextTo(entry.getKey());
+            }
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public void updateFromStep(NLPStepAnalysis step, ContextAwareStepProcessor context) {
+        String primaryObject = step.getPrimaryObject();
+        
+        if (primaryObject != null) {
+            // Update last mentioned element
+            lastMentionedElement = primaryObject;
+            
+            // Update spatial relations
+            for (Relation relation : step.getRelations()) {
+                if ("spatial".equals(relation.getType())) {
+                    String source = relation.getSource();
+                    String target = relation.getTarget();
+                    
+                    // Record the relation
+                    if (!spatialRelations.containsKey(source)) {
+                        spatialRelations.put(source, new ArrayList<>());
+                    }
+                    spatialRelations.get(source).add(target);
+                }
+            }
+        }
+    }
+    
+    @Override
+    public void reset() {
+        lastMentionedElement = null;
+        spatialRelations.clear();
+    }
+    
+    private String getElementAbove(String reference) {
+        for (Map.Entry<String, List<String>> entry : spatialRelations.entrySet()) {
+            if (entry.getValue().contains(reference) && entry.getKey().contains("above")) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+    
+    private String getElementBelow(String reference) {
+        for (Map.Entry<String, List<String>> entry : spatialRelations.entrySet()) {
+            if (entry.getValue().contains(reference) && entry.getKey().contains("below")) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+    
+    private String getElementNextTo(String reference) {
+        for (Map.Entry<String, List<String>> entry : spatialRelations.entrySet()) {
+            if (entry.getValue().contains(reference) && 
+                (entry.getKey().contains("next to") || entry.getKey().contains("beside"))) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+}
+
+/**
+ * Tracks element references for later retrieval
+ */
+class ElementReferenceTracker implements ReferenceTracker {
+    private LinkedHashMap<String, String> elementReferences;
+    private static final int MAX_HISTORY = 10;
+    
+    public ElementReferenceTracker() {
+        this.elementReferences = new LinkedHashMap<String, String>() {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                return size() > MAX_HISTORY;
+            }
+        };
+    }
+    
+    @Override
+    public String resolveReference(String reference, NLPStepAnalysis currentStep, 
+                                  ContextAwareStepProcessor context) {
+        // Handle references by element type or descriptor
+        if (reference.contains("same") || reference.contains("previous")) {
+            // Extract the type of element being referenced
+            String elementType = extractElementType(reference);
+            
+            if (elementType != null) {
+                // Find most recent reference of this type
+                for (Map.Entry<String, String> entry : elementReferences.entrySet()) {
+                    if (entry.getKey().contains(elementType)) {
+                        return entry.getValue();
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public void updateFromStep(NLPStepAnalysis step, ContextAwareStepProcessor context) {
+        String primaryObject = step.getPrimaryObject();
+        
+        if (primaryObject != null) {
+            // Extract element type and add to references
+            String elementType = extractElementType(primaryObject);
+            
+            if (elementType != null) {
+                elementReferences.put(elementType, primaryObject);
+            }
+        }
+    }
+    
+    @Override
+    public void reset() {
+        elementReferences.clear();
+    }
+    
+    private String extractElementType(String reference) {
+        String[] commonTypes = {"button", "link", "field", "input", "checkbox", "radio", 
+                              "dropdown", "select", "icon", "image", "element"};
+        
+        for (String type : commonTypes) {
+            if (reference.contains(type)) {
+                return type;
+            }
+        }
+        
+        return null;
+    }
+}
+
+/**
+ * Tracks form fields for field navigation
+ */
+class FormReferenceTracker implements ReferenceTracker {
+    private List<String> formFields;
+    private String currentForm;
+    
+    public FormReferenceTracker() {
+        this.formFields = new ArrayList<>();
+    }
+    
+    @Override
+    public String resolveReference(String reference, NLPStepAnalysis currentStep, 
+                                  ContextAwareStepProcessor context) {
+        // Handle form navigation references
+        if (reference.contains("next field") || reference.contains("following field")) {
+            return getNextField(currentStep);
+        } else if (reference.contains("previous field")) {
+            return getPreviousField(currentStep);
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public void updateFromStep(NLPStepAnalysis step, ContextAwareStepProcessor context) {
+        String primaryObject = step.getPrimaryObject();
+        
+        if (primaryObject != null && isFormField(primaryObject)) {
+            // Add to form fields if not already present
+            if (!formFields.contains(primaryObject)) {
+                formFields.add(primaryObject);
+            }
+            
+            // Detect if we're in a form
+            if (step.getEntities().values().stream()
+                    .anyMatch(e -> e.contains("form"))) {
+                currentForm = "form";
+            }
+        }
+    }
+    
+    @Override
+    public void reset() {
+        formFields.clear();
+        currentForm = null;
+    }
+    
+    private boolean isFormField(String reference) {
+        return reference.contains("field") || reference.contains("input") || 
+               reference.contains("textbox") || reference.contains("textarea") ||
+               reference.contains("dropdown") || reference.contains("select") ||
+               reference.contains("checkbox") || reference.contains("radio");
+    }
+    
+    private String getNextField(NLPStepAnalysis currentStep) {
+        String currentField = currentStep.getPrimaryObject();
+        
+        if (currentField != null && formFields.contains(currentField)) {
+            int index = formFields.indexOf(currentField);
+            
+            if (index < formFields.size() - 1) {
+                return formFields.get(index + 1);
+            }
+        }
+        
+        return null;
+    }
+    
+    private String getPreviousField(NLPStepAnalysis currentStep) {
+        String currentField = currentStep.getPrimaryObject();
+        
+        if (currentField != null && formFields.contains(currentField)) {
+            int index = formFields.indexOf(currentField);
+            
+            if (index > 0) {
+                return formFields.get(index - 1);
+            }
+        }
+        
+        return null;
+    }
+}
+
+/**
+ * Tracks page context for navigation understanding
+ */
+class PageReferenceTracker implements ReferenceTracker {
+    private String currentPage;
+    private String previousPage;
+    private Map<String, List<String>> pageElements;
+    
+    public PageReferenceTracker() {
+        this.pageElements = new HashMap<>();
+    }
+    
+    @Override
+    public String resolveReference(String reference, NLPStepAnalysis currentStep, 
+                                  ContextAwareStepProcessor context) {
+        // Handle page-related references
+        if (reference.contains("current page") && currentPage != null) {
+            return currentPage;
+        } else if (reference.contains("previous page") && previousPage != null) {
+            return previousPage;
+        }
+        
+        // Handle references to elements on a specific page
+        if (currentPage != null && pageElements.containsKey(currentPage)) {
+            for (String element : pageElements.get(currentPage)) {
+                if (calculateSimilarity(reference, element) > 0.7) {
+                    return element;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public void updateFromStep(NLPStepAnalysis step, ContextAwareStepProcessor context) {
+        // Check for page navigation
+        String locationInfo = step.getLocationInfo();
+        
+        if (locationInfo != null && (locationInfo.contains("page") || 
+                                    locationInfo.contains("screen") || 
+                                    locationInfo.contains("site"))) {
+            previousPage = currentPage;
+            currentPage = locationInfo;
+        }
+        
+        // Record elements seen on the current page
+        if (currentPage != null && step.getPrimaryObject() != null) {
+            if (!pageElements.containsKey(currentPage)) {
+                pageElements.put(currentPage, new ArrayList<>());
+            }
+            
+            if (!pageElements.get(currentPage).contains(step.getPrimaryObject())) {
+                pageElements.get(currentPage).add(step.getPrimaryObject());
+            }
+        }
+    }
+    
+    @Override
+    public void reset() {
+        currentPage = null;
+        previousPage = null;
+        pageElements.clear();
+    }
+    
+    private double calculateSimilarity(String s1, String s2) {
+        if (s1 == null || s2 == null) {
+            return 0.0;
+        }
+        
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        
+        if (s1.contains(s2) || s2.contains(s1)) {
+            return 0.9;
+        }
+        
+        String[] words1 = s1.split("\\s+");
+        String[] words2 = s2.split("\\s+");
+        
+        int matches = 0;
+        for (String word1 : words1) {
+            for (String word2 : words2) {
+                if (word1.equals(word2) || word1.contains(word2) || word2.contains(word1)) {
+                    matches++;
+                    break;
+                }
+            }
+        }
+        
+        return (double) matches / Math.max(words1.length, words2.length);
+    }
+}
+
+
+
+package com.cssmart.codeless;
+
+import com.cssmart.ai.context.ContextAwareStepProcessor;
+import com.cssmart.ai.interpreter.FeatureInterpreter;
+import com.cssmart.ai.nlp.AdvancedNLPProcessor;
+import com.cssmart.ai.visual.VisualElementFinder;
+import com.cssmart.bdd.CSSmartBDDExecutor;
+import com.cssmart.bdd.CSSmartScenario;
+import com.cssmart.bdd.CSSmartTestStep;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.element.CSSmartWebElement;
+import com.cssmart.healing.HealingManager;
+import com.cssmart.reporting.CSSmartReport;
+import com.cssmart.ui.CSSmartBasePage;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Main test class for running codeless tests
+ * Integrates all AI components for seamless natural language test execution
+ */
+public class CodelessTest {
+    protected CSSmartDriver driver;
+    protected FeatureInterpreter interpreter;
+    protected AdvancedNLPProcessor nlpProcessor;
+    protected ContextAwareStepProcessor contextProcessor;
+    protected VisualElementFinder visualFinder;
+    protected HealingManager healingManager;
+    protected CSSmartReport reporter;
+    
+    private CSSmartScenario scenario;
+    private boolean stopOnFailure = true;
+    
+    /**
+     * Initialize the codeless test with a scenario
+     * @param scenario The scenario to execute
+     */
+    public CodelessTest(CSSmartScenario scenario) {
+        this.scenario = scenario;
+    }
+    
+    /**
+     * Default constructor for direct step execution
+     */
+    public CodelessTest() {
+        this.scenario = null;
+    }
+    
+    @BeforeClass
+    public void setUp() {
+        reporter = CSSmartReport.getInstance();
+        reporter.logInfo("Setting up AI-powered codeless test" + 
+                       (scenario != null ? " for scenario: " + scenario.getName() : ""));
+        
+        // Initialize the driver
+        driver = new CSSmartDriver();
+        
+        // Initialize all AI components
+        interpreter = new FeatureInterpreter(driver);
+        nlpProcessor = new AdvancedNLPProcessor();
+        contextProcessor = new ContextAwareStepProcessor(driver);
+        visualFinder = new VisualElementFinder(driver);
+        healingManager = new HealingManager(driver);
+        
+        // Connect the components
+        connectComponents();
+    }
+    
+    /**
+     * Connect all components to work together
+     */
+    private void connectComponents() {
+        // This would typically be done through dependency injection
+        // or a more sophisticated component registry
+        // For demonstration, we'll assume the components have appropriate setters
+        
+        // Provide context to interpreter
+        if (interpreter instanceof EnhancedFeatureInterpreter) {
+            ((EnhancedFeatureInterpreter) interpreter).setContextProcessor(contextProcessor);
+            ((EnhancedFeatureInterpreter) interpreter).setVisualFinder(visualFinder);
+            ((EnhancedFeatureInterpreter) interpreter).setHealingManager(healingManager);
+        }
+    }
+    
+    /**
+     * Execute the complete scenario
+     */
+    @Test
+    public void executeScenario() {
+        if (scenario == null) {
+            reporter.logWarning("No scenario provided for execution");
+            return;
+        }
+        
+        reporter.logInfo("Executing AI-powered codeless scenario: " + scenario.getName());
+        reporter.startScenario(scenario.getName());
+        
+        // Reset context for this scenario
+        contextProcessor.resetContext();
+        
+        boolean scenarioSuccess = true;
+        for (CSSmartTestStep step : scenario.getSteps()) {
+            reporter.startStep(step.getDescription());
+            boolean stepResult = executeStep(step.getDescription());
+            reporter.endStep(stepResult);
+            
+            if (!stepResult) {
+                scenarioSuccess = false;
+                if (stopOnFailure) {
+                    break;
+                }
+            }
+        }
+        
+        reporter.endScenario(scenarioSuccess);
+        org.testng.Assert.assertTrue(scenarioSuccess, "Scenario failed: " + scenario.getName());
+    }
+    
+    /**
+     * Execute a single step
+     * @param stepText The text of the step to execute
+     * @return true if successful, false otherwise
+     */
+    public boolean executeStep(String stepText) {
+        return interpreter.interpretAndExecute(stepText);
+    }
+    
+    /**
+     * Execute a sequence of steps
+     * @param steps The steps to execute
+     * @return true if all steps passed, false otherwise
+     */
+    public boolean executeSteps(List<String> steps) {
+        boolean allPassed = true;
+        
+        for (String step : steps) {
+            boolean stepResult = executeStep(step);
+            if (!stepResult) {
+                allPassed = false;
+                if (stopOnFailure) {
+                    break;
+                }
+            }
+        }
+        
+        return allPassed;
+    }
+    
+    /**
+     * Set whether to stop on first failure
+     * @param stop true to stop on failure, false to continue
+     */
+    public void setStopOnFailure(boolean stop) {
+        this.stopOnFailure = stop;
+    }
+    
+    @AfterClass
+    public void tearDown() {
+        reporter.logInfo("Tearing down AI-powered codeless test" + 
+                      (scenario != null ? " for scenario: " + scenario.getName() : ""));
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+
+/**
+ * Enhanced feature interpreter that integrates all AI components
+ * This extends the basic FeatureInterpreter with more advanced capabilities
+ */
+class EnhancedFeatureInterpreter extends FeatureInterpreter {
+    private ContextAwareStepProcessor contextProcessor;
+    private VisualElementFinder visualFinder;
+    private HealingManager healingManager;
+    private AdvancedNLPProcessor nlpProcessor;
+    
+    public EnhancedFeatureInterpreter(CSSmartDriver driver) {
+        super(driver);
+        this.nlpProcessor = new AdvancedNLPProcessor();
+    }
+    
+    /**
+     * Set the context processor
+     */
+    public void setContextProcessor(ContextAwareStepProcessor contextProcessor) {
+        this.contextProcessor = contextProcessor;
+    }
+    
+    /**
+     * Set the visual finder
+     */
+    public void setVisualFinder(VisualElementFinder visualFinder) {
+        this.visualFinder = visualFinder;
+    }
+    
+    /**
+     * Set the healing manager
+     */
+    public void setHealingManager(HealingManager healingManager) {
+        this.healingManager = healingManager;
+    }
+    
+    /**
+     * Enhanced interpretation using all AI capabilities
+     */
+    @Override
+    public boolean interpretAndExecute(String stepText) {
+        CSSmartReport reporter = CSSmartReport.getInstance();
+        reporter.logInfo("Enhanced AI Interpreter executing: " + stepText);
+        
+        try {
+            // Process step with context awareness
+            Map<String, Object> contextParams = contextProcessor.processStep(stepText);
+            
+            // Find element with multiple strategies including visual
+            CSSmartWebElement element = null;
+            String elementDescription = (String) contextParams.get("elementDescription");
+            
+            if (elementDescription != null) {
+                // First try standard element finder
+                element = super.findElement(elementDescription);
+                
+                // If not found, try visual recognition
+                if (element == null && visualFinder != null) {
+                    element = visualFinder.findElementByVisual(elementDescription);
+                    
+                    if (element != null) {
+                        reporter.logInfo("Element found using visual recognition: " + elementDescription);
+                        
+                        // Create a visual profile for future use
+                        visualFinder.createVisualProfile(element, elementDescription);
+                    }
+                }
+                
+                // If still not found, try healing
+                if (element == null && healingManager != null) {
+                    element = healingManager.findAndHealElement(elementDescription);
+                    
+                    if (element != null) {
+                        reporter.logInfo("Element found using self-healing: " + elementDescription);
+                    }
+                }
+                
+                // If element found, store in context
+                if (element != null) {
+                    contextProcessor.recordElement(elementDescription, element);
+                }
+            }
+            
+            // Execute the action with enhanced context
+            boolean result = super.executeAction(contextParams, element);
+            
+            // Update context with result
+            if (result && contextParams.containsKey("extractedValue")) {
+                contextProcessor.storeVariable(
+                    "lastExtracted", contextParams.get("extractedValue")
+                );
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            reporter.logError("Exception in enhanced interpreter: " + e.getMessage());
+            return false;
+        }
+    }
+}
+
+/**
+ * Factory for creating codeless tests from feature files or directories
+ */
+public class CodelessTestFactory {
+    private final String featuresPath;
+    private boolean stopOnFailure = true;
+    
+    /**
+     * Create a factory for the specified features path
+     * @param featuresPath Path to feature files
+     */
+    public CodelessTestFactory(String featuresPath) {
+        this.featuresPath = featuresPath;
+    }
+    
+    /**
+     * Create test instances for all features
+     * @return Array of test instances
+     */
+    public Object[] createTests() {
+        CSSmartReport reporter = CSSmartReport.getInstance();
+        reporter.logInfo("Creating codeless tests from features in: " + featuresPath);
+        
+        List<Object> tests = new ArrayList<>();
+        
+        try {
+            // Parse all feature files in the directory
+            java.io.File featuresDir = new java.io.File(featuresPath);
+            
+            if (featuresDir.exists() && featuresDir.isDirectory()) {
+                java.io.File[] featureFiles = featuresDir.listFiles(
+                    (dir, name) -> name.endsWith(".feature")
+                );
+                
+                if (featureFiles != null) {
+                    for (java.io.File featureFile : featureFiles) {
+                        // Parse the feature file
+                        List<CSSmartScenario> scenarios = parseFeatureFile(featureFile);
+                        
+                        // Create test for each scenario
+                        for (CSSmartScenario scenario : scenarios) {
+                            CodelessTest test = new CodelessTest(scenario);
+                            test.setStopOnFailure(stopOnFailure);
+                            tests.add(test);
+                        }
+                    }
+                }
+            } else {
+                reporter.logWarning("Features path does not exist or is not a directory: " + featuresPath);
+            }
+        } catch (Exception e) {
+            reporter.logError("Error creating codeless tests: " + e.getMessage());
+        }
+        
+        return tests.toArray();
+    }
+    
+    /**
+     * Parse a feature file into scenarios
+     */
+    private List<CSSmartScenario> parseFeatureFile(java.io.File featureFile) {
+        List<CSSmartScenario> scenarios = new ArrayList<>();
+        
+        try {
+            List<String> lines = java.nio.file.Files.readAllLines(featureFile.toPath());
+            
+            String featureName = null;
+            CSSmartScenario currentScenario = null;
+            
+            for (String line : lines) {
+                line = line.trim();
+                
+                if (line.isEmpty() || line.startsWith("#")) {
+                    // Skip empty lines and comments
+                    continue;
+                }
+                
+                if (line.startsWith("Feature:")) {
+                    featureName = line.substring("Feature:".length()).trim();
+                } else if (line.startsWith("Scenario:") || line.startsWith("Scenario Outline:")) {
+                    // Complete previous scenario if any
+                    if (currentScenario != null) {
+                        scenarios.add(currentScenario);
+                    }
+                    
+                    // Start new scenario
+                    String scenarioName = line.substring(line.indexOf(":") + 1).trim();
+                    currentScenario = new CSSmartScenario(scenarioName, featureName);
+                } else if (line.startsWith("Given ") || line.startsWith("When ") || 
+                           line.startsWith("Then ") || line.startsWith("And ") || 
+                           line.startsWith("But ")) {
+                    // Add step to current scenario
+                    if (currentScenario != null) {
+                        CSSmartTestStep step = new CSSmartTestStep(line);
+                        currentScenario.addStep(step);
+                    }
+                }
+            }
+            
+            // Add last scenario
+            if (currentScenario != null) {
+                scenarios.add(currentScenario);
+            }
+            
+        } catch (Exception e) {
+            CSSmartReport.getInstance().logError("Error parsing feature file: " + e.getMessage());
+        }
+        
+        return scenarios;
+    }
+    
+    /**
+     * Set whether tests should stop on first failure
+     * @param stop true to stop on failure, false to continue
+     */
+    public void setStopOnFailure(boolean stop) {
+        this.stopOnFailure = stop;
+    }
+}
+
+/**
+ * Runner for executing codeless tests
+ */
+public class CodelessRunner {
+    /**
+     * Run all codeless tests in a directory
+     * @param featuresPath Path to feature files
+     */
+    public static void runTests(String featuresPath) {
+        CodelessTestFactory factory = new CodelessTestFactory(featuresPath);
+        Object[] tests = factory.createTests();
+        
+        org.testng.TestNG testng = new org.testng.TestNG();
+        List<Class<?>> testClasses = new ArrayList<>();
+        
+        for (Object test : tests) {
+            if (test instanceof CodelessTest) {
+                testClasses.add(test.getClass());
+            }
+        }
+        
+        testng.setTestClasses(testClasses.toArray(new Class[0]));
+        testng.run();
+    }
+    
+    /**
+     * Run a specific feature file
+     * @param featureFilePath Path to feature file
+     */
+    public static void runFeature(String featureFilePath) {
+        try {
+            java.io.File featureFile = new java.io.File(featureFilePath);
+            
+            if (featureFile.exists() && featureFile.isFile()) {
+                String featuresPath = featureFile.getParent();
+                CodelessTestFactory factory = new CodelessTestFactory(featuresPath);
+                Object[] tests = factory.createTests();
+                
+                org.testng.TestNG testng = new org.testng.TestNG();
+                testng.setTestClasses(new Class<?>[] {CodelessTest.class});
+                testng.run();
+            } else {
+                System.err.println("Feature file does not exist: " + featureFilePath);
+            }
+        } catch (Exception e) {
+            System.err.println("Error running feature: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Main method for command-line execution
+     */
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Usage: CodelessRunner <features-path>");
+            return;
+        }
+        
+        String featuresPath = args[0];
+        runTests(featuresPath);
+    }
+}
+
+
+package com.cssmart.examples;
+
+import com.cssmart.bdd.CSSmartScenario;
+import com.cssmart.bdd.CSSmartTestStep;
+import com.cssmart.codeless.CodelessTest;
+import com.cssmart.codeless.CodelessRunner;
+import com.cssmart.config.PropertyManager;
+import com.cssmart.driver.CSSmartDriver;
+import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Complete set of examples showing how to use the AI-powered codeless testing
+ */
+public class CodelessTestingExamples {
+
+    /**
+     * Example 1: Running a test using only a feature file
+     */
+    @Test
+    public void testRunFromFeatureFile() {
+        // Just point to a feature file and run it
+        String featureFile = "src/test/resources/features/login.feature";
+        CodelessRunner.runFeature(featureFile);
+        
+        // Or run all features in a directory
+        String featuresDir = "src/test/resources/features";
+        CodelessRunner.runTests(featuresDir);
+    }
+    
+    /**
+     * Example 2: Programmatically creating and running a scenario
+     */
+    @Test
+    public void testProgrammaticScenario() {
+        // Create a scenario programmatically
+        CSSmartScenario scenario = new CSSmartScenario("Login Test", "Authentication");
+        
+        // Add steps using natural language
+        scenario.addStep(new CSSmartTestStep("Given I am on the login page"));
+        scenario.addStep(new CSSmartTestStep("When I enter \"testuser\" in the username field"));
+        scenario.addStep(new CSSmartTestStep("And I enter \"password123\" in the password field"));
+        scenario.addStep(new CSSmartTestStep("And I click the login button"));
+        scenario.addStep(new CSSmartTestStep("Then I should see the dashboard"));
+        
+        // Run the scenario
+        CodelessTest test = new CodelessTest(scenario);
+        test.setUp();
+        test.executeScenario();
+        test.tearDown();
+    }
+    
+    /**
+     * Example 3: Running individual steps
+     */
+    @Test
+    public void testIndividualSteps() {
+        // Create test without scenario for direct step execution
+        CodelessTest test = new CodelessTest();
+        test.setUp();
+        
+        // Execute individual steps
+        test.executeStep("I navigate to https://example.com");
+        test.executeStep("I click the first link");
+        test.executeStep("I should see \"More information\" on the page");
+        
+        test.tearDown();
+    }
+    
+    /**
+     * Example 4: Running a list of steps
+     */
+    @Test
+    public void testStepsList() {
+        CodelessTest test = new CodelessTest();
+        test.setUp();
+        
+        List<String> steps = new ArrayList<>();
+        steps.add("I am on the shopping site");
+        steps.add("I search for \"smartphone\"");
+        steps.add("I click on the first product");
+        steps.add("I click the \"Add to Cart\" button");
+        steps.add("I click the \"Checkout\" button");
+        steps.add("I should see the payment page");
+        
+        test.executeSteps(steps);
+        
+        test.tearDown();
+    }
+    
+    /**
+     * Example 5: Running with TestNG XML
+     */
+    public static void main(String[] args) {
+        org.testng.TestNG testng = new org.testng.TestNG();
+        List<Class<?>> classes = new ArrayList<>();
+        classes.add(CodelessTestingExamples.class);
+        testng.setTestClasses(classes.toArray(new Class[0]));
+        testng.run();
+    }
+}
+
+/**
+ * Example of a complex e-commerce test using only natural language
+ */
+@Test
+public class ECommerceWorkflowTest {
+    @Test
+    public void testCompleteShoppingWorkflow() {
+        CodelessTest test = new CodelessTest();
+        test.setUp();
+        
+        List<String> steps = new ArrayList<>();
+        
+        // Navigate to the site
+        steps.add("I navigate to the e-commerce site");
+        steps.add("I should see the homepage");
+        
+        // Login
+        steps.add("I click the \"Sign In\" link");
+        steps.add("I enter \"test.user@example.com\" in the email field");
+        steps.add("I enter \"testpassword\" in the password field");
+        steps.add("I click the \"Login\" button");
+        steps.add("I should see \"Welcome, Test User\" on the page");
+        
+        // Browse products
+        steps.add("I click on the \"Electronics\" category");
+        steps.add("I should see the products page");
+        steps.add("I click the \"Sort by\" dropdown");
+        steps.add("I select \"Price: Low to High\"");
+        
+        // Add to cart
+        steps.add("I click on the first product");
+        steps.add("I should see the product details page");
+        steps.add("I enter \"2\" in the quantity field");
+        steps.add("I click the \"Add to Cart\" button");
+        steps.add("I should see \"Item added to your cart\" message");
+        
+        // Checkout
+        steps.add("I click the \"Cart\" icon");
+        steps.add("I should see the shopping cart page");
+        steps.add("I verify the total price is correct");
+        steps.add("I click the \"Proceed to Checkout\" button");
+        
+        // Shipping address
+        steps.add("I should see the checkout page");
+        steps.add("I enter \"123 Test Street\" in the address field");
+        steps.add("I enter \"Test City\" in the city field");
+        steps.add("I select \"California\" from the state dropdown");
+        steps.add("I enter \"90210\" in the zip code field");
+        steps.add("I click the \"Continue to Payment\" button");
+        
+        // Payment
+        steps.add("I should see the payment page");
+        steps.add("I enter \"4111111111111111\" in the credit card field");
+        steps.add("I enter \"Test User\" in the cardholder name field");
+        steps.add("I enter \"12/25\" in the expiration date field");
+        steps.add("I enter \"123\" in the CVV field");
+        steps.add("I click the \"Complete Order\" button");
+        
+        // Order confirmation
+        steps.add("I should see the order confirmation page");
+        steps.add("I should see \"Thank you for your order\" message");
+        steps.add("I should see an order number");
+        
+        test.executeSteps(steps);
+        test.tearDown();
+    }
+}
+
+/**
+ * Here's a complete sample feature file that users would create:
+ * 
+ * File: src/test/resources/features/login.feature
+ */
+
+/*
+Feature: User Authentication
+
+Scenario: Successful login
+  Given I am on the login page
+  When I enter "testuser" in the username field
+  And I enter "password123" in the password field
+  And I click the login button
+  Then I should see the dashboard
+  And I should see "Welcome, Test User" on the page
+
+Scenario: Failed login
+  Given I am on the login page
+  When I enter "wronguser" in the username field
+  And I enter "wrongpass" in the password field
+  And I click the login button
+  Then I should see an error message
+  And I should see "Invalid username or password" on the page
+  
+Scenario: Password reset
+  Given I am on the login page
+  When I click the "Forgot Password" link
+  Then I should see the password reset page
+  When I enter "testuser@example.com" in the email field
+  And I click the "Reset Password" button
+  Then I should see a confirmation message
+*/
+
+/**
+ * Here's a complete sample TestNG XML file for running codeless tests:
+ * 
+ * File: src/test/resources/codeless-testng.xml
+ */
+
+/*
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Codeless Test Suite">
+  <parameter name="browser" value="chrome"/>
+  <parameter name="headless" value="false"/>
+  <parameter name="implicitWait" value="10"/>
+  <parameter name="featuresPath" value="src/test/resources/features"/>
+  
+  <test name="Authentication Tests">
+    <parameter name="featureFile" value="login.feature"/>
+    <classes>
+      <class name="com.cssmart.codeless.CodelessRunner"/>
+    </classes>
+  </test>
+  
+  <test name="E-Commerce Tests">
+    <parameter name="featureFile" value="shopping.feature"/>
+    <classes>
+      <class name="com.cssmart.codeless.CodelessRunner"/>
+    </classes>
+  </test>
+</suite>
+*/
+
+/**
+ * Example of running from command line:
+ * 
+ * # Run all tests in a directory
+ * java -cp cssmart.jar com.cssmart.codeless.CodelessRunner src/test/resources/features
+ * 
+ * # Run a specific feature file
+ * java -cp cssmart.jar com.cssmart.codeless.CodelessRunner src/test/resources/features/login.feature
+ * 
+ * # Run with TestNG XML
+ * java -cp cssmart.jar org.testng.TestNG src/test/resources/codeless-testng.xml
+ */
+
+
+
+ # CSSmart AI-Powered Codeless Testing Framework
+
+**User Guide & Complete Documentation**
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Key Features](#key-features)
+3. [Getting Started](#getting-started)
+4. [Writing Tests](#writing-tests)
+5. [Running Tests](#running-tests)
+6. [Advanced Features](#advanced-features)
+7. [Best Practices](#best-practices)
+8. [Troubleshooting](#troubleshooting)
+9. [Example Scenarios](#example-scenarios)
+10. [API Reference](#api-reference)
+
+## Introduction
+
+The CSSmart AI-Powered Codeless Testing Framework enables true codeless test automation using natural language. Users simply write Gherkin feature files with plain English descriptions, and our sophisticated AI engine automatically interprets and executes these tests without requiring any step definition code.
+
+This framework represents a significant advancement in test automation, making it accessible to everyone on the team while leveraging powerful AI capabilities:
+
+- Self-healing element location
+- Natural language processing
+- Visual element recognition
+- Context-aware test execution
+- Intelligent element finding
+
+## Key Features
+
+### 1. Pure Natural Language Testing
+
+Write tests in plain English without any code:
+
+```gherkin
+Feature: User Authentication
+
+Scenario: Successful login
+  Given I am on the login page
+  When I enter "testuser" in the username field
+  And I enter "password123" in the password field
+  And I click the login button
+  Then I should see the dashboard
+```
+
+### 2. AI-Powered Element Finding
+
+The framework uses multiple strategies to locate elements:
+
+- Traditional locators (ID, CSS, XPath) with automatic conversion
+- Semantic understanding (finding elements by description)
+- Visual recognition (finding elements by appearance)
+- Contextual awareness (understanding references like "it", "the previous field")
+
+### 3. Self-Healing Capabilities
+
+Tests automatically adapt to UI changes:
+
+- Generates alternative locators when original ones fail
+- Learns from successful healings for future use
+- Builds visual profiles of elements for recognition
+- Falls back to AI-based element finding as a last resort
+
+### 4. Context Awareness
+
+The system maintains context between steps:
+
+- Understands relative references ("it", "the same field")
+- Recognizes page contexts and transitions
+- Tracks form field relationships
+- Remembers element positions and relationships
+
+### 5. Advanced NLP Processing
+
+Sophisticated language understanding:
+
+- Handles various phrasings and synonyms
+- Extracts actions, targets, and values accurately
+- Understands relationships between elements
+- Resolves ambiguous references
+
+### 6. Visual Element Recognition
+
+Finds elements based on their visual appearance:
+
+- Recognizes common UI patterns (buttons, inputs, dropdowns)
+- Creates visual profiles for future recognition
+- Handles complex layouts and custom components
+- Works even when traditional locators fail
+
+### 7. Multiple Execution Methods
+
+Flexible test execution options:
+
+- Direct API calls
+- TestNG integration
+- Command-line execution
+- CI/CD pipeline integration
+
+## Getting Started
+
+### Installation
+
+1. Add the CSSmart framework to your project:
+
+```xml
+<dependency>
+    <groupId>com.cssmart</groupId>
+    <artifactId>cssmart-framework</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+2. Configure properties in `cssmart-config.properties`:
+
+```properties
+browser=chrome
+headless=false
+implicitWait=10
+featuresPath=src/test/resources/features
+```
+
+### Basic Setup
+
+Create your first feature file:
+
+1. Create a directory: `src/test/resources/features`
+2. Create a file: `login.feature`
+3. Write your test scenario in Gherkin:
+
+```gherkin
+Feature: User Authentication
+
+Scenario: Successful login
+  Given I am on the login page
+  When I enter "testuser" in the username field
+  And I enter "password123" in the password field
+  And I click the login button
+  Then I should see the dashboard
+```
+
+## Writing Tests
+
+### Supported Step Patterns
+
+#### Navigation
+
+```gherkin
+Given I am on the login page
+Given I navigate to "https://example.com"
+Given I go to the home page
+```
+
+#### Clicking
+
+```gherkin
+When I click the login button
+When I click on the "Sign Up" link
+When I press the submit button
+```
+
+#### Input
+
+```gherkin
+When I enter "John Smith" in the name field
+When I type "test@example.com" in the email input
+When I fill the password field with "securepass123"
+```
+
+#### Selection
+
+```gherkin
+When I select "California" from the state dropdown
+When I check the "I agree" checkbox
+When I select the first option from the menu
+```
+
+#### Verification
+
+```gherkin
+Then I should see the dashboard
+Then I should see "Welcome, User" on the page
+Then the error message should contain "Invalid credentials"
+Then the submit button should be enabled
+```
+
+#### Wait
+
+```gherkin
+When I wait for the page to load
+When I wait for the spinner to disappear
+When I wait 5 seconds
+```
+
+### Using Element Descriptions
+
+You can refer to elements in many different ways:
+
+```gherkin
+# By label/text
+When I click the "Sign In" button
+
+# By type and position
+When I click the first link
+
+# By relationship
+When I enter "John" in the field next to "Name:"
+
+# By attribute
+When I click the button with id "submit-btn"
+
+# By relative position
+When I click the button below the email field
+```
+
+### Using Variables
+
+Store and reuse values:
+
+```gherkin
+When I store the text of the order number as "orderNum"
+Then I enter ${orderNum} in the search field
+```
+
+### Contextual References
+
+Use pronouns and relative references:
+
+```gherkin
+When I click the login button
+Then I should see it change color
+
+When I fill the username field
+And I enter "password123" in the next field
+```
+
+## Running Tests
+
+### Method 1: Using Java API
+
+```java
+// Run a specific feature file
+CodelessRunner.runFeature("src/test/resources/features/login.feature");
+
+// Run all features in a directory
+CodelessRunner.runTests("src/test/resources/features");
+```
+
+### Method 2: Using TestNG
+
+Create a `testng.xml` file:
+
+```xml
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Codeless Test Suite">
+  <parameter name="browser" value="chrome"/>
+  <parameter name="featuresPath" value="src/test/resources/features"/>
+  
+  <test name="Authentication Tests">
+    <parameter name="featureFile" value="login.feature"/>
+    <classes>
+      <class name="com.cssmart.codeless.CodelessRunner"/>
+    </classes>
+  </test>
+</suite>
+```
+
+Run with TestNG:
+
+```
+mvn test -DsuiteXmlFile=testng.xml
+```
+
+### Method 3: Command Line
+
+```bash
+# Run all tests in a directory
+java -cp cssmart.jar com.cssmart.codeless.CodelessRunner src/test/resources/features
+
+# Run a specific feature file
+java -cp cssmart.jar com.cssmart.codeless.CodelessRunner src/test/resources/features/login.feature
+```
+
+### Method 4: Programmatic Creation
+
+```java
+// Create a scenario programmatically
+CSSmartScenario scenario = new CSSmartScenario("Login Test", "Authentication");
+
+// Add steps using natural language
+scenario.addStep(new CSSmartTestStep("Given I am on the login page"));
+scenario.addStep(new CSSmartTestStep("When I enter \"testuser\" in the username field"));
+scenario.addStep(new CSSmartTestStep("And I enter \"password123\" in the password field"));
+scenario.addStep(new CSSmartTestStep("And I click the login button"));
+scenario.addStep(new CSSmartTestStep("Then I should see the dashboard"));
+
+// Run the scenario
+CodelessTest test = new CodelessTest(scenario);
+test.setUp();
+test.executeScenario();
+test.tearDown();
+```
+
+## Advanced Features
+
+### Visual Element Recognition
+
+When traditional locators fail, the system can find elements by visual appearance:
+
+```gherkin
+# Even without clear locators, this will work
+When I click the shopping cart icon
+```
+
+The framework will:
+1. Take a screenshot
+2. Analyze the image for elements matching the description
+3. Create a visual profile for future recognition
+
+### Self-Healing
+
+If elements change, the framework automatically adapts:
+
+1. When an element cannot be found, it tries multiple healing strategies
+2. If healing succeeds, it learns from the experience for future tests
+3. Healing patterns are stored in `healing-patterns.json`
+
+### Context-Aware Testing
+
+The system maintains state between steps:
+
+```gherkin
+When I click the first product
+And I add it to my cart
+Then I should see it in the shopping cart
+```
+
+The framework understands that "it" refers to the first product.
+
+### Form Navigation
+
+Easily navigate through forms:
+
+```gherkin
+When I enter "John" in the first name field
+And I enter "Smith" in the next field
+And I select "USA" from the next dropdown
+```
+
+### Page Awareness
+
+The system tracks page transitions:
+
+```gherkin
+Given I am on the login page
+When I click the login button
+Then I should be on the dashboard page
+When I click the profile link
+Then I should be on the profile page
+```
+
+## Best Practices
+
+### 1. Use Clear Element Descriptions
+
+```gherkin
+# Good
+When I click the "Sign In" button
+
+# Avoid
+When I click the button
+```
+
+### 2. Provide Context
+
+```gherkin
+# Good
+Given I am on the login page
+When I enter "username" in the email field
+
+# Avoid
+When I enter "username" in the field
+```
+
+### 3. Use Specific Verifications
+
+```gherkin
+# Good
+Then I should see "Order Confirmed" on the page
+Then the order number should be visible
+
+# Avoid
+Then I should see the confirmation
+```
+
+### 4. Group Related Steps
+
+```gherkin
+# Good structure
+Given I am on the login page
+When I enter my credentials
+And I click the login button
+Then I should see the dashboard
+
+# Separate section
+When I navigate to the profile section
+Then I should see my account details
+```
+
+### 5. Use Tags for Organization
+
+```gherkin
+@login @smoke
+Scenario: Successful login
+  Given I am on the login page
+  ...
+
+@login @regression
+Scenario: Failed login
+  Given I am on the login page
+  ...
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Element Not Found**
+   - Make sure your description is clear and specific
+   - Try using different descriptors (text, type, position)
+   - Add more context about the page
+
+2. **Ambiguous Element References**
+   - Be more specific in your element description
+   - Use unique identifiers when available
+   - Provide positioning information (e.g., "the first button", "the button next to...")
+
+3. **Verification Failures**
+   - Check exact text vs. contains text verifications
+   - Verify the element is visible and not covered
+   - Wait for animations or loading to complete
+
+4. **Page Context Issues**
+   - Ensure proper navigation steps
+   - Add waits for page loads when needed
+   - Verify you're on the expected page before actions
+
+### Debug Mode
+
+Enable debug logging for more information:
+
+```properties
+cssmart.logging.level=DEBUG
+cssmart.screenshot.onFail=true
+```
+
+### Test Reports
+
+Detailed reports are generated at:
+```
+target/cssmart-reports/index.html
+```
+
+## Example Scenarios
+
+### E-Commerce Order Flow
+
+```gherkin
+Feature: E-Commerce Workflow
+
+Scenario: Complete purchase flow
+  Given I navigate to the e-commerce site
+  When I click the "Sign In" link
+  And I enter "test.user@example.com" in the email field
+  And I enter "testpassword" in the password field
+  And I click the "Login" button
+  Then I should see "Welcome, Test User" on the page
+  
+  When I click on the "Electronics" category
+  And I click on the first product
+  And I enter "2" in the quantity field
+  And I click the "Add to Cart" button
+  Then I should see "Item added to your cart" message
+  
+  When I click the "Cart" icon
+  And I click the "Proceed to Checkout" button
+  And I enter "123 Test Street" in the address field
+  And I enter "Test City" in the city field
+  And I select "California" from the state dropdown
+  And I enter "90210" in the zip code field
+  And I click the "Continue to Payment" button
+  
+  When I enter "4111111111111111" in the credit card field
+  And I enter "Test User" in the cardholder name field
+  And I enter "12/25" in the expiration date field
+  And I enter "123" in the CVV field
+  And I click the "Complete Order" button
+  
+  Then I should see the order confirmation page
+  And I should see "Thank you for your order" message
+  And I store the text of the order number as "orderNum"
+```
+
+### Form Submission with Validation
+
+```gherkin
+Feature: Contact Form
+
+Scenario: Submit contact form with validation
+  Given I am on the contact page
+  
+  # Missing field validation
+  When I click the "Submit" button
+  Then I should see "Name is required" error message
+  
+  # Field completion
+  When I enter "John Doe" in the name field
+  And I enter "john@example.com" in the email field
+  And I enter "Question about product" in the subject field
+  And I enter "This is my detailed question about your product." in the message textbox
+  And I check the "I agree to terms" checkbox
+  
+  # Successful submission
+  When I click the "Submit" button
+  Then I should see the confirmation page
+  And I should see "Thank you for your message" on the page
+```
+
+### Dashboard Data Verification
+
+```gherkin
+Feature: Dashboard Analytics
+
+Scenario: Verify dashboard data
+  Given I am logged in as an admin user
+  And I am on the analytics dashboard
+  
+  # Data verification
+  Then the total sales value should be greater than "1000"
+  And the conversion rate should be between "2%" and "5%"
+  And the top selling product should contain "Premium Widget"
+  
+  # Interactive elements
+  When I select "Last 30 days" from the date range dropdown
+  Then the chart should update
+  And the total sales value should change
+  
+  # Download functionality
+  When I click the "Download Report" button
+  Then the Excel report should be downloaded
+```
+
+## API Reference
+
+### Core Classes
+
+#### `CodelessTest`
+
+Main class for executing tests.
+
+```java
+// Create and run a test
+CodelessTest test = new CodelessTest();
+test.setUp();
+test.executeStep("I navigate to the homepage");
+test.tearDown();
+
+// Run multiple steps
+List<String> steps = new ArrayList<>();
+steps.add("I click the login button");
+steps.add("I enter 'username' in the email field");
+test.executeSteps(steps);
+
+// Run a scenario
+CSSmartScenario scenario = new CSSmartScenario("Login", "Authentication");
+// Add steps...
+CodelessTest scenarioTest = new CodelessTest(scenario);
+scenarioTest.executeScenario();
+```
+
+#### `CodelessRunner`
+
+Utility for running tests from files.
+
+```java
+// Run a specific feature
+CodelessRunner.runFeature("path/to/login.feature");
+
+// Run all features in a directory
+CodelessRunner.runTests("path/to/features");
+```
+
+#### `CSSmartScenario`
+
+Represents a test scenario.
+
+```java
+CSSmartScenario scenario = new CSSmartScenario("Login Test", "Authentication");
+scenario.addStep(new CSSmartTestStep("Given I am on the login page"));
+scenario.addTag("smoke");
+```
+
+### Configuration Options
+
+#### Browser Configuration
+
+```properties
+# Browser type
+browser=chrome
+browser=firefox
+browser=edge
+
+# Headless mode
+headless=true
+headless=false
+
+# Window size
+windowWidth=1920
+windowHeight=1080
+```
+
+#### Timeouts
+
+```properties
+# Default wait timeout (seconds)
+implicitWait=10
+explicitWait=15
+pageLoadTimeout=30
+```
+
+#### Self-Healing
+
+```properties
+# Enable/disable self-healing
+selfHealing=true
+
+# Healing strategies
+healingStrategies=id,css,xpath,text,visual
+
+# Learning threshold
+healingLearningThreshold=3
+```
+
+#### Reporting
+
+```properties
+# Report format
+reportFormat=html
+
+# Screenshots
+takeScreenshots=onFail
+takeScreenshots=always
+takeScreenshots=never
+
+# Report path
+reportPath=target/cssmart-reports
+```
+
+---
+
+This comprehensive User Guide provides all the information needed to successfully use the CSSmart AI-Powered Codeless Testing Framework. The framework enables true codeless testing through advanced AI capabilities, making test automation accessible to everyone while maintaining robustness and reliability.
+
+
