@@ -1,0 +1,3247 @@
+package com.cssmart.core.utils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Custom logger for the CSSmart framework.
+ * Wraps around SLF4J Logger to provide enhanced logging capabilities.
+ */
+public class CSSmartLogger {
+    
+    private final Logger logger;
+    
+    private CSSmartLogger(Logger logger) {
+        this.logger = logger;
+    }
+    
+    /**
+     * Gets a CSSmartLogger for the specified class.
+     * 
+     * @param clazz The class to get the logger for
+     * @return CSSmartLogger instance
+     */
+    public static CSSmartLogger getLogger(Class<?> clazz) {
+        return new CSSmartLogger(LoggerFactory.getLogger(clazz));
+    }
+    
+    /**
+     * Gets a CSSmartLogger with the specified name.
+     * 
+     * @param name The logger name
+     * @return CSSmartLogger instance
+     */
+    public static CSSmartLogger getLogger(String name) {
+        return new CSSmartLogger(LoggerFactory.getLogger(name));
+    }
+    
+    /**
+     * Log a message at TRACE level.
+     * 
+     * @param message The message to log
+     */
+    public void trace(String message) {
+        logger.trace(message);
+    }
+    
+    /**
+     * Log a message with parameters at TRACE level.
+     * 
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void trace(String message, Object... args) {
+        logger.trace(message, args);
+    }
+    
+    /**
+     * Log a message at DEBUG level.
+     * 
+     * @param message The message to log
+     */
+    public void debug(String message) {
+        logger.debug(message);
+    }
+    
+    /**
+     * Log a message with parameters at DEBUG level.
+     * 
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void debug(String message, Object... args) {
+        logger.debug(message, args);
+    }
+    
+    /**
+     * Log a message at INFO level.
+     * 
+     * @param message The message to log
+     */
+    public void info(String message) {
+        logger.info(message);
+    }
+    
+    /**
+     * Log a message with parameters at INFO level.
+     * 
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void info(String message, Object... args) {
+        logger.info(message, args);
+    }
+    
+    /**
+     * Log a message at WARN level.
+     * 
+     * @param message The message to log
+     */
+    public void warn(String message) {
+        logger.warn(message);
+    }
+    
+    /**
+     * Log a message with parameters at WARN level.
+     * 
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void warn(String message, Object... args) {
+        logger.warn(message, args);
+    }
+    
+    /**
+     * Log a message at ERROR level.
+     * 
+     * @param message The message to log
+     */
+    public void error(String message) {
+        logger.error(message);
+    }
+    
+    /**
+     * Log a message with parameters at ERROR level.
+     * 
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void error(String message, Object... args) {
+        logger.error(message, args);
+    }
+    
+    /**
+     * Log a message with exception at ERROR level.
+     * 
+     * @param message The message to log
+     * @param throwable The exception to log
+     */
+    public void error(String message, Throwable throwable) {
+        logger.error(message, throwable);
+    }
+    
+    /**
+     * Log a message at specified level.
+     * 
+     * @param level The log level
+     * @param message The message to log
+     */
+    public void log(CSSmartLogLevel level, String message) {
+        switch (level) {
+            case TRACE:
+                trace(message);
+                break;
+            case DEBUG:
+                debug(message);
+                break;
+            case INFO:
+                info(message);
+                break;
+            case WARN:
+                warn(message);
+                break;
+            case ERROR:
+                error(message);
+                break;
+        }
+    }
+    
+    /**
+     * Log a message with parameters at specified level.
+     * 
+     * @param level The log level
+     * @param message The message format
+     * @param args The arguments for the message
+     */
+    public void log(CSSmartLogLevel level, String message, Object... args) {
+        switch (level) {
+            case TRACE:
+                trace(message, args);
+                break;
+            case DEBUG:
+                debug(message, args);
+                break;
+            case INFO:
+                info(message, args);
+                break;
+            case WARN:
+                warn(message, args);
+                break;
+            case ERROR:
+                error(message, args);
+                break;
+        }
+    }
+    
+    /**
+     * Check if logging is enabled for a specific level.
+     * 
+     * @param level The log level to check
+     * @return True if logging is enabled for the level
+     */
+    public boolean isEnabled(CSSmartLogLevel level) {
+        switch (level) {
+            case TRACE:
+                return logger.isTraceEnabled();
+            case DEBUG:
+                return logger.isDebugEnabled();
+            case INFO:
+                return logger.isInfoEnabled();
+            case WARN:
+                return logger.isWarnEnabled();
+            case ERROR:
+                return logger.isErrorEnabled();
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * Enum for log levels in the CSSmart framework.
+     */
+    public enum CSSmartLogLevel {
+        TRACE,
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR
+    }
+}
+
+
+
+package com.cssmart.core.reporting;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.openqa.selenium.WebDriver;
+
+import com.cssmart.core.utils.CSSmartLogger;
+import com.cssmart.core.utils.CSSmartScreenshot;
+import com.cssmart.core.config.PropertyManager;
+
+/**
+ * Custom HTML report generator for the CSSmart framework.
+ * Creates detailed reports with screenshots, logs, and test results.
+ */
+public class CSSmartReport {
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartReport.class);
+    private static final CSSmartReport INSTANCE = new CSSmartReport();
+    
+    private static final String REPORT_DIRECTORY = "report.dir";
+    private static final String REPORT_DATE_FORMAT = "report.date.format";
+    private static final String DEFAULT_REPORT_DIR = "target/cssmart-reports";
+    private static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd_HHmmss";
+    
+    private final PropertyManager propertyManager;
+    private final String reportDir;
+    private final SimpleDateFormat dateFormat;
+    
+    private final ConcurrentMap<String, CSSmartTestResult> testResults;
+    private CSSmartTestResult currentTest;
+    
+    private CSSmartReport() {
+        this.propertyManager = PropertyManager.getInstance();
+        this.reportDir = propertyManager.getProperty(REPORT_DIRECTORY, DEFAULT_REPORT_DIR);
+        this.dateFormat = new SimpleDateFormat(
+                propertyManager.getProperty(REPORT_DATE_FORMAT, DEFAULT_DATE_FORMAT));
+        this.testResults = new ConcurrentHashMap<>();
+        
+        // Create report directory if it doesn't exist
+        try {
+            Files.createDirectories(Paths.get(reportDir));
+            LOGGER.info("Created report directory: {}", reportDir);
+        } catch (Exception e) {
+            LOGGER.error("Failed to create report directory: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Get the singleton instance of CSSmartReport.
+     * 
+     * @return The CSSmartReport instance
+     */
+    public static CSSmartReport getInstance() {
+        return INSTANCE;
+    }
+    
+    /**
+     * Start a new test case.
+     * 
+     * @param testName The test name
+     * @param testDescription The test description
+     */
+    public synchronized void startTest(String testName, String testDescription) {
+        LOGGER.info("Starting test: {}", testName);
+        
+        String timestamp = dateFormat.format(new Date());
+        CSSmartTestResult testResult = new CSSmartTestResult(testName, testDescription, timestamp);
+        
+        testResults.put(testName, testResult);
+        currentTest = testResult;
+        
+        logInfo("Test started: " + testName);
+    }
+    
+    /**
+     * End the current test case.
+     * 
+     * @param status The test status (PASS/FAIL/SKIP)
+     */
+    public synchronized void endTest(CSSmartTestResult.Status status) {
+        if (currentTest == null) {
+            LOGGER.warn("Cannot end test: No test currently running");
+            return;
+        }
+        
+        currentTest.setEndTime(System.currentTimeMillis());
+        currentTest.setStatus(status);
+        
+        LOGGER.info("Test ended: {} with status: {}", currentTest.getTestName(), status);
+        logInfo("Test ended with status: " + status);
+        
+        // Generate report for this test
+        generateTestReport(currentTest);
+        
+        currentTest = null;
+    }
+    
+    /**
+     * Log a step in the current test.
+     * 
+     * @param stepDescription The step description
+     * @param status The step status (PASS/FAIL/SKIP/INFO)
+     */
+    public synchronized void logStep(String stepDescription, CSSmartTestStep.Status status) {
+        if (currentTest == null) {
+            LOGGER.warn("Cannot log step: No test currently running");
+            return;
+        }
+        
+        CSSmartTestStep step = new CSSmartTestStep(stepDescription, status);
+        currentTest.addStep(step);
+        
+        switch (status) {
+            case PASS:
+                LOGGER.info("STEP PASSED: {}", stepDescription);
+                break;
+            case FAIL:
+                LOGGER.error("STEP FAILED: {}", stepDescription);
+                break;
+            case SKIP:
+                LOGGER.warn("STEP SKIPPED: {}", stepDescription);
+                break;
+            case INFO:
+                LOGGER.info("STEP INFO: {}", stepDescription);
+                break;
+        }
+    }
+    
+    /**
+     * Log a passing step in the current test.
+     * 
+     * @param stepDescription The step description
+     */
+    public void logPass(String stepDescription) {
+        logStep(stepDescription, CSSmartTestStep.Status.PASS);
+    }
+    
+    /**
+     * Log a failing step in the current test.
+     * 
+     * @param stepDescription The step description
+     */
+    public void logFail(String stepDescription) {
+        logStep(stepDescription, CSSmartTestStep.Status.FAIL);
+    }
+    
+    /**
+     * Log a skipped step in the current test.
+     * 
+     * @param stepDescription The step description
+     */
+    public void logSkip(String stepDescription) {
+        logStep(stepDescription, CSSmartTestStep.Status.SKIP);
+    }
+    
+    /**
+     * Log an info step in the current test.
+     * 
+     * @param stepDescription The step description
+     */
+    public void logInfo(String stepDescription) {
+        logStep(stepDescription, CSSmartTestStep.Status.INFO);
+    }
+    
+    /**
+     * Log a successful step with a screenshot.
+     * 
+     * @param driver The WebDriver instance
+     * @param stepDescription The step description
+     */
+    public void logPassWithScreenshot(WebDriver driver, String stepDescription) {
+        logPass(stepDescription);
+        captureScreenshot(driver, "PASS_" + sanitizeFilename(stepDescription));
+    }
+    
+    /**
+     * Log a failing step with a screenshot.
+     * 
+     * @param driver The WebDriver instance
+     * @param stepDescription The step description
+     */
+    public void logFailWithScreenshot(WebDriver driver, String stepDescription) {
+        logFail(stepDescription);
+        captureScreenshot(driver, "FAIL_" + sanitizeFilename(stepDescription));
+    }
+    
+    /**
+     * Log a warning message in the current test.
+     * 
+     * @param message The warning message
+     */
+    public void logWarning(String message) {
+        LOGGER.warn(message);
+        if (currentTest != null) {
+            currentTest.addWarning(message);
+        }
+    }
+    
+    /**
+     * Capture a screenshot and attach it to the current test.
+     * 
+     * @param driver The WebDriver instance
+     * @param screenshotName The screenshot name
+     * @return The path to the saved screenshot
+     */
+    public String captureScreenshot(WebDriver driver, String screenshotName) {
+        if (currentTest == null) {
+            LOGGER.warn("Cannot capture screenshot: No test currently running");
+            return null;
+        }
+        
+        try {
+            String timestamp = dateFormat.format(new Date());
+            String filename = sanitizeFilename(screenshotName) + "_" + timestamp + ".png";
+            
+            String screenshotDir = reportDir + File.separator + 
+                    sanitizeFilename(currentTest.getTestName()) + File.separator + "screenshots";
+            
+            Files.createDirectories(Paths.get(screenshotDir));
+            
+            String filePath = screenshotDir + File.separator + filename;
+            CSSmartScreenshot.capture(driver, filePath);
+            
+            currentTest.addScreenshot(filePath);
+            LOGGER.info("Screenshot captured: {}", filePath);
+            
+            return filePath;
+        } catch (Exception e) {
+            LOGGER.error("Failed to capture screenshot: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Generate a report for all test results.
+     */
+    public void generateReport() {
+        LOGGER.info("Generating overall test report");
+        
+        try {
+            String timestamp = dateFormat.format(new Date());
+            String reportFilename = "cssmart-report_" + timestamp + ".html";
+            String reportPath = reportDir + File.separator + reportFilename;
+            
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html>\n");
+            html.append("<html lang=\"en\">\n");
+            html.append("<head>\n");
+            html.append("    <meta charset=\"UTF-8\">\n");
+            html.append("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+            html.append("    <title>CSSmart Test Report</title>\n");
+            html.append("    <style>\n");
+            html.append("        body { font-family: Arial, sans-serif; margin: 20px; }\n");
+            html.append("        .report-header { background-color: #4CAF50; color: white; padding: 10px; }\n");
+            html.append("        .test-summary { margin: 20px 0; }\n");
+            html.append("        .test-table { width: 100%; border-collapse: collapse; }\n");
+            html.append("        .test-table th, .test-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n");
+            html.append("        .test-table th { background-color: #f2f2f2; }\n");
+            html.append("        .test-pass { background-color: #dff0d8; }\n");
+            html.append("        .test-fail { background-color: #f2dede; }\n");
+            html.append("        .test-skip { background-color: #fcf8e3; }\n");
+            html.append("    </style>\n");
+            html.append("</head>\n");
+            html.append("<body>\n");
+            
+            // Report header
+            html.append("    <div class=\"report-header\">\n");
+            html.append("        <h1>CSSmart Test Report</h1>\n");
+            html.append("        <p>Generated on: ").append(new Date()).append("</p>\n");
+            html.append("    </div>\n");
+            
+            // Test summary
+            int total = testResults.size();
+            int passed = 0;
+            int failed = 0;
+            int skipped = 0;
+            
+            for (CSSmartTestResult result : testResults.values()) {
+                switch (result.getStatus()) {
+                    case PASS:
+                        passed++;
+                        break;
+                    case FAIL:
+                        failed++;
+                        break;
+                    case SKIP:
+                        skipped++;
+                        break;
+                }
+            }
+            
+            html.append("    <div class=\"test-summary\">\n");
+            html.append("        <h2>Test Summary</h2>\n");
+            html.append("        <p>Total Tests: ").append(total).append("</p>\n");
+            html.append("        <p>Passed: ").append(passed).append("</p>\n");
+            html.append("        <p>Failed: ").append(failed).append("</p>\n");
+            html.append("        <p>Skipped: ").append(skipped).append("</p>\n");
+            html.append("    </div>\n");
+            
+            // Test details table
+            html.append("    <div class=\"test-details\">\n");
+            html.append("        <h2>Test Details</h2>\n");
+            html.append("        <table class=\"test-table\">\n");
+            html.append("            <thead>\n");
+            html.append("                <tr>\n");
+            html.append("                    <th>Test Name</th>\n");
+            html.append("                    <th>Description</th>\n");
+            html.append("                    <th>Status</th>\n");
+            html.append("                    <th>Duration</th>\n");
+            html.append("                    <th>Report</th>\n");
+            html.append("                </tr>\n");
+            html.append("            </thead>\n");
+            html.append("            <tbody>\n");
+            
+            for (CSSmartTestResult result : testResults.values()) {
+                String statusClass = "";
+                switch (result.getStatus()) {
+                    case PASS:
+                        statusClass = "test-pass";
+                        break;
+                    case FAIL:
+                        statusClass = "test-fail";
+                        break;
+                    case SKIP:
+                        statusClass = "test-skip";
+                        break;
+                }
+                
+                html.append("                <tr class=\"").append(statusClass).append("\">\n");
+                html.append("                    <td>").append(result.getTestName()).append("</td>\n");
+                html.append("                    <td>").append(result.getTestDescription()).append("</td>\n");
+                html.append("                    <td>").append(result.getStatus()).append("</td>\n");
+                html.append("                    <td>").append(result.getDuration()).append(" ms</td>\n");
+                
+                String testReportPath = reportDir + File.separator + 
+                        sanitizeFilename(result.getTestName()) + File.separator + 
+                        sanitizeFilename(result.getTestName()) + "_report.html";
+                
+                File testReportFile = new File(testReportPath);
+                if (testReportFile.exists()) {
+                    String relativePath = sanitizeFilename(result.getTestName()) + File.separator + 
+                            sanitizeFilename(result.getTestName()) + "_report.html";
+                    html.append("                    <td><a href=\"").append(relativePath)
+                            .append("\" target=\"_blank\">View Details</a></td>\n");
+                } else {
+                    html.append("                    <td>No report available</td>\n");
+                }
+                
+                html.append("                </tr>\n");
+            }
+            
+            html.append("            </tbody>\n");
+            html.append("        </table>\n");
+            html.append("    </div>\n");
+            html.append("</body>\n");
+            html.append("</html>");
+            
+            // Write report file
+            Files.write(Paths.get(reportPath), html.toString().getBytes());
+            
+            LOGGER.info("Overall report generated: {}", reportPath);
+        } catch (Exception e) {
+            LOGGER.error("Failed to generate overall report: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Generate a detailed report for a specific test.
+     * 
+     * @param testResult The test result to generate a report for
+     */
+    private void generateTestReport(CSSmartTestResult testResult) {
+        LOGGER.info("Generating test report for: {}", testResult.getTestName());
+        
+        try {
+            String testDirName = sanitizeFilename(testResult.getTestName());
+            String testDir = reportDir + File.separator + testDirName;
+            
+            Files.createDirectories(Paths.get(testDir));
+            
+            String reportFilename = testDirName + "_report.html";
+            String reportPath = testDir + File.separator + reportFilename;
+            
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html>\n");
+            html.append("<html lang=\"en\">\n");
+            html.append("<head>\n");
+            html.append("    <meta charset=\"UTF-8\">\n");
+            html.append("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+            html.append("    <title>Test Report: ").append(testResult.getTestName()).append("</title>\n");
+            html.append("    <style>\n");
+            html.append("        body { font-family: Arial, sans-serif; margin: 20px; }\n");
+            html.append("        .report-header { background-color: #4CAF50; color: white; padding: 10px; }\n");
+            html.append("        .test-info { margin: 20px 0; }\n");
+            html.append("        .step-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n");
+            html.append("        .step-table th, .step-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n");
+            html.append("        .step-table th { background-color: #f2f2f2; }\n");
+            html.append("        .step-pass { background-color: #dff0d8; }\n");
+            html.append("        .step-fail { background-color: #f2dede; }\n");
+            html.append("        .step-skip { background-color: #fcf8e3; }\n");
+            html.append("        .step-info { background-color: #d9edf7; }\n");
+            html.append("        .screenshots { margin: 20px 0; }\n");
+            html.append("        .screenshot { margin-bottom: 20px; }\n");
+            html.append("        .screenshot img { max-width: 100%; border: 1px solid #ddd; }\n");
+            html.append("        .warnings { margin: 20px 0; color: #8a6d3b; background-color: #fcf8e3; padding: 15px; }\n");
+            html.append("    </style>\n");
+            html.append("</head>\n");
+            html.append("<body>\n");
+            
+            // Report header
+            String statusClass = "";
+            switch (testResult.getStatus()) {
+                case PASS:
+                    statusClass = "test-pass";
+                    break;
+                case FAIL:
+                    statusClass = "test-fail";
+                    break;
+                case SKIP:
+                    statusClass = "test-skip";
+                    break;
+            }
+            
+            html.append("    <div class=\"report-header ").append(statusClass).append("\">\n");
+            html.append("        <h1>Test Report: ").append(testResult.getTestName()).append("</h1>\n");
+            html.append("        <p>Status: ").append(testResult.getStatus()).append("</p>\n");
+            html.append("    </div>\n");
+            
+            // Test info
+            html.append("    <div class=\"test-info\">\n");
+            html.append("        <h2>Test Information</h2>\n");
+            html.append("        <p><strong>Description:</strong> ").append(testResult.getTestDescription()).append("</p>\n");
+            html.append("        <p><strong>Start Time:</strong> ").append(new Date(testResult.getStartTime())).append("</p>\n");
+            html.append("        <p><strong>End Time:</strong> ").append(new Date(testResult.getEndTime())).append("</p>\n");
+            html.append("        <p><strong>Duration:</strong> ").append(testResult.getDuration()).append(" ms</p>\n");
+            html.append("    </div>\n");
+            
+            // Test steps
+            html.append("    <div class=\"test-steps\">\n");
+            html.append("        <h2>Test Steps</h2>\n");
+            html.append("        <table class=\"step-table\">\n");
+            html.append("            <thead>\n");
+            html.append("                <tr>\n");
+            html.append("                    <th>#</th>\n");
+            html.append("                    <th>Step Description</th>\n");
+            html.append("                    <th>Status</th>\n");
+            html.append("                    <th>Timestamp</th>\n");
+            html.append("                </tr>\n");
+            html.append("            </thead>\n");
+            html.append("            <tbody>\n");
+            
+            List<CSSmartTestStep> steps = testResult.getSteps();
+            for (int i = 0; i < steps.size(); i++) {
+                CSSmartTestStep step = steps.get(i);
+                
+                String stepStatusClass = "";
+                switch (step.getStatus()) {
+                    case PASS:
+                        stepStatusClass = "step-pass";
+                        break;
+                    case FAIL:
+                        stepStatusClass = "step-fail";
+                        break;
+                    case SKIP:
+                        stepStatusClass = "step-skip";
+                        break;
+                    case INFO:
+                        stepStatusClass = "step-info";
+                        break;
+                }
+                
+                html.append("                <tr class=\"").append(stepStatusClass).append("\">\n");
+                html.append("                    <td>").append(i + 1).append("</td>\n");
+                html.append("                    <td>").append(step.getDescription()).append("</td>\n");
+                html.append("                    <td>").append(step.getStatus()).append("</td>\n");
+                html.append("                    <td>").append(new Date(step.getTimestamp())).append("</td>\n");
+                html.append("                </tr>\n");
+            }
+            
+            html.append("            </tbody>\n");
+            html.append("        </table>\n");
+            html.append("    </div>\n");
+            
+            // Warnings
+            List<String> warnings = testResult.getWarnings();
+            if (!warnings.isEmpty()) {
+                html.append("    <div class=\"warnings\">\n");
+                html.append("        <h2>Warnings</h2>\n");
+                html.append("        <ul>\n");
+                
+                for (String warning : warnings) {
+                    html.append("            <li>").append(warning).append("</li>\n");
+                }
+                
+                html.append("        </ul>\n");
+                html.append("    </div>\n");
+            }
+            
+            // Screenshots
+            List<String> screenshots = testResult.getScreenshots();
+            if (!screenshots.isEmpty()) {
+                html.append("    <div class=\"screenshots\">\n");
+                html.append("        <h2>Screenshots</h2>\n");
+                
+                for (String screenshot : screenshots) {
+                    File screenshotFile = new File(screenshot);
+                    if (screenshotFile.exists()) {
+                        String filename = screenshotFile.getName();
+                        String relativePath = "screenshots" + File.separator + filename;
+                        
+                        html.append("        <div class=\"screenshot\">\n");
+                        html.append("            <h3>").append(filename).append("</h3>\n");
+                        html.append("            <img src=\"").append(relativePath).append("\" alt=\"").append(filename).append("\">\n");
+                        html.append("        </div>\n");
+                    }
+                }
+                
+                html.append("    </div>\n");
+            }
+            
+            html.append("</body>\n");
+            html.append("</html>");
+            
+            // Write report file
+            Files.write(Paths.get(reportPath), html.toString().getBytes());
+            
+            LOGGER.info("Test report generated: {}", reportPath);
+        } catch (Exception e) {
+            LOGGER.error("Failed to generate test report: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Sanitize a filename by removing invalid characters.
+     * 
+     * @param filename The filename to sanitize
+     * @return The sanitized filename
+     */
+    private String sanitizeFilename(String filename) {
+        return filename.replaceAll("[^a-zA-Z0-9.-]", "_");
+    }
+}
+
+
+package com.cssmart.core.reporting;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Represents the result of a test execution in the CSSmart framework.
+ * Contains test information, steps, screenshots, and warnings.
+ */
+public class CSSmartTestResult {
+    
+    /**
+     * Enum for test status values.
+     */
+    public enum Status {
+        PASS,
+        FAIL,
+        SKIP,
+        IN_PROGRESS
+    }
+    
+    private final String testName;
+    private final String testDescription;
+    private final String timestamp;
+    private final long startTime;
+    private long endTime;
+    private Status status;
+    
+    private final List<CSSmartTestStep> steps;
+    private final List<String> screenshots;
+    private final List<String> warnings;
+    
+    /**
+     * Constructs a new test result.
+     * 
+     * @param testName The test name
+     * @param testDescription The test description
+     * @param timestamp The test timestamp
+     */
+    public CSSmartTestResult(String testName, String testDescription, String timestamp) {
+        this.testName = testName;
+        this.testDescription = testDescription;
+        this.timestamp = timestamp;
+        this.startTime = System.currentTimeMillis();
+        this.status = Status.IN_PROGRESS;
+        
+        this.steps = new ArrayList<>();
+        this.screenshots = new ArrayList<>();
+        this.warnings = new ArrayList<>();
+    }
+    
+    /**
+     * Get the test name.
+     * 
+     * @return The test name
+     */
+    public String getTestName() {
+        return testName;
+    }
+    
+    /**
+     * Get the test description.
+     * 
+     * @return The test description
+     */
+    public String getTestDescription() {
+        return testDescription;
+    }
+    
+    /**
+     * Get the test timestamp.
+     * 
+     * @return The test timestamp
+     */
+    public String getTimestamp() {
+        return timestamp;
+    }
+    
+    /**
+     * Get the test start time.
+     * 
+     * @return The test start time in milliseconds
+     */
+    public long getStartTime() {
+        return startTime;
+    }
+    
+    /**
+     * Get the test end time.
+     * 
+     * @return The test end time in milliseconds
+     */
+    public long getEndTime() {
+        return endTime;
+    }
+    
+    /**
+     * Set the test end time.
+     * 
+     * @param endTime The test end time in milliseconds
+     */
+    public void setEndTime(long endTime) {
+        this.endTime = endTime;
+    }
+    
+    /**
+     * Get the test duration.
+     * 
+     * @return The test duration in milliseconds
+     */
+    public long getDuration() {
+        if (endTime == 0) {
+            return System.currentTimeMillis() - startTime;
+        }
+        return endTime - startTime;
+    }
+    
+    /**
+     * Get the test status.
+     * 
+     * @return The test status
+     */
+    public Status getStatus() {
+        return status;
+    }
+    
+    /**
+     * Set the test status.
+     * 
+     * @param status The test status
+     */
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+    
+    /**
+     * Add a test step.
+     * 
+     * @param step The test step to add
+     */
+    public void addStep(CSSmartTestStep step) {
+        steps.add(step);
+    }
+    
+    /**
+     * Get all test steps.
+     * 
+     * @return An unmodifiable list of test steps
+     */
+    public List<CSSmartTestStep> getSteps() {
+        return Collections.unmodifiableList(steps);
+    }
+    
+    /**
+     * Add a screenshot.
+     * 
+     * @param screenshotPath The path to the screenshot
+     */
+    public void addScreenshot(String screenshotPath) {
+        screenshots.add(screenshotPath);
+    }
+    
+    /**
+     * Get all screenshots.
+     * 
+     * @return An unmodifiable list of screenshot paths
+     */
+    public List<String> getScreenshots() {
+        return Collections.unmodifiableList(screenshots);
+    }
+    
+    /**
+     * Add a warning.
+     * 
+     * @param warning The warning message
+     */
+    public void addWarning(String warning) {
+        warnings.add(warning);
+    }
+    
+    /**
+     * Get all warnings.
+     * 
+     * @return An unmodifiable list of warning messages
+     */
+    public List<String> getWarnings() {
+        return Collections.unmodifiableList(warnings);
+    }
+    
+    /**
+     * Check if the test has failed steps.
+     * 
+     * @return True if the test has failed steps
+     */
+    public boolean hasFailedSteps() {
+        return steps.stream().anyMatch(step -> step.getStatus() == CSSmartTestStep.Status.FAIL);
+    }
+    
+    /**
+     * Count steps by status.
+     * 
+     * @param status The status to count
+     * @return The number of steps with the specified status
+     */
+    public int countStepsByStatus(CSSmartTestStep.Status status) {
+        return (int) steps.stream().filter(step -> step.getStatus() == status).count();
+    }
+    
+    @Override
+    public String toString() {
+        return "CSSmartTestResult{" +
+                "testName='" + testName + '\'' +
+                ", status=" + status +
+                ", steps=" + steps.size() +
+                ", duration=" + getDuration() + "ms" +
+                '}';
+    }
+}
+
+
+package com.cssmart.core.reporting;
+
+/**
+ * Represents a test step in the CSSmart framework.
+ * Contains step description, status, and timestamp.
+ */
+public class CSSmartTestStep {
+    
+    /**
+     * Enum for step status values.
+     */
+    public enum Status {
+        PASS,
+        FAIL,
+        SKIP,
+        INFO
+    }
+    
+    private final String description;
+    private final Status status;
+    private final long timestamp;
+    
+    /**
+     * Constructs a new test step.
+     * 
+     * @param description The step description
+     * @param status The step status
+     */
+    public CSSmartTestStep(String description, Status status) {
+        this.description = description;
+        this.status = status;
+        this.timestamp = System.currentTimeMillis();
+    }
+    
+    /**
+     * Get the step description.
+     * 
+     * @return The step description
+     */
+    public String getDescription() {
+        return description;
+    }
+    
+    /**
+     * Get the step status.
+     * 
+     * @return The step status
+     */
+    public Status getStatus() {
+        return status;
+    }
+    
+    /**
+     * Get the step timestamp.
+     * 
+     * @return The step timestamp in milliseconds
+     */
+    public long getTimestamp() {
+        return timestamp;
+    }
+    
+    @Override
+    public String toString() {
+        return "CSSmartTestStep{" +
+                "description='" + description + '\'' +
+                ", status=" + status +
+                '}';
+    }
+}
+
+
+package com.cssmart.core.utils;
+
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import javax.imageio.ImageIO;
+
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+/**
+ * Utility class for capturing and comparing screenshots in the CSSmart framework.
+ */
+public class CSSmartScreenshot {
+    
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartScreenshot.class);
+    
+    private CSSmartScreenshot() {
+        // Private constructor to prevent instantiation
+    }
+    
+    /**
+     * Capture a screenshot of the current browser window.
+     * 
+     * @param driver The WebDriver instance
+     * @param filePath The file path to save the screenshot
+     * @return True if the screenshot was captured successfully, false otherwise
+     */
+    public static boolean capture(WebDriver driver, String filePath) {
+        LOGGER.debug("Capturing screenshot to: {}", filePath);
+        
+        try {
+            if (!(driver instanceof TakesScreenshot)) {
+                LOGGER.error("WebDriver does not support taking screenshots");
+                return false;
+            }
+            
+            // Ensure directory exists
+            Path path = Paths.get(filePath);
+            Files.createDirectories(path.getParent());
+            
+            // Take screenshot
+            File screenshotFile = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+            Files.copy(screenshotFile.toPath(), path);
+            
+            LOGGER.debug("Screenshot captured successfully");
+            return true;
+        } catch (IOException e) {
+            LOGGER.error("Failed to capture screenshot: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Capture a screenshot of a specific element.
+     * 
+     * @param driver The WebDriver instance
+     * @param element The WebElement to capture
+     * @param filePath The file path to save the screenshot
+     * @return True if the screenshot was captured successfully, false otherwise
+     */
+    public static boolean captureElement(WebDriver driver, WebElement element, String filePath) {
+        LOGGER.debug("Capturing element screenshot to: {}", filePath);
+        
+        try {
+            if (!(driver instanceof TakesScreenshot)) {
+                LOGGER.error("WebDriver does not support taking screenshots");
+                return false;
+            }
+            
+            // Ensure directory exists
+            Path path = Paths.get(filePath);
+            Files.createDirectories(path.getParent());
+            
+            // Take full screenshot
+            File screenshotFile = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+            BufferedImage fullImg = ImageIO.read(screenshotFile);
+            
+            // Get element dimension and location
+            int width = element.getSize().getWidth();
+            int height = element.getSize().getHeight();
+            int x = element.getLocation().getX();
+            int y = element.getLocation().getY();
+            
+            // Crop the image
+            BufferedImage elementImg = fullImg.getSubimage(x, y, width, height);
+            ImageIO.write(elementImg, "png", new File(filePath));
+            
+            LOGGER.debug("Element screenshot captured successfully");
+            return true;
+        } catch (Exception e) {
+            LOGGER.error("Failed to capture element screenshot: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Compare two screenshots for differences.
+     * 
+     * @param baselinePath The baseline screenshot path
+     * @param actualPath The actual screenshot path
+     * @param diffPath The path to save the difference image
+     * @param threshold The threshold for considering pixels different (0.0 to 1.0)
+     * @return The difference percentage (0.0 to 1.0)
+     */
+    public static double compareScreenshots(String baselinePath, String actualPath, String diffPath, double threshold) {
+        LOGGER.debug("Comparing screenshots: {} and {}", baselinePath, actualPath);
+        
+        try {
+            BufferedImage baseline = ImageIO.read(new File(baselinePath));
+            BufferedImage actual = ImageIO.read(new File(actualPath));
+            
+            if (baseline.getWidth() != actual.getWidth() || baseline.getHeight() != actual.getHeight()) {
+                LOGGER.warn("Screenshots have different dimensions: {}x{} vs {}x{}",
+                        baseline.getWidth(), baseline.getHeight(), actual.getWidth(), actual.getHeight());
+                return 1.0; // 100% different
+            }
+            
+            int width = baseline.getWidth();
+            int height = baseline.getHeight();
+            
+            // Create difference image
+            BufferedImage diff = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            
+            long differentPixels = 0;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int baselineRGB = baseline.getRGB(x, y);
+                    int actualRGB = actual.getRGB(x, y);
+                    
+                    // Check if pixels are different
+                    if (baselineRGB != actualRGB) {
+                        differentPixels++;
+                        // Mark different pixels as red in diff image
+                        diff.setRGB(x, y, 0xFF0000); // Red
+                    } else {
+                        // Copy original pixel to diff image
+                        diff.setRGB(x, y, baselineRGB);
+                    }
+                }
+            }
+            
+            // Calculate difference percentage
+            double totalPixels = width * height;
+            double diffPercentage = differentPixels / totalPixels;
+            
+            // Save difference image if requested
+            if (diffPath != null && !diffPath.isEmpty()) {
+                Path path = Paths.get(diffPath);
+                Files.createDirectories(path.getParent());
+                ImageIO.write(diff, "png", new File(diffPath));
+            }
+            
+            LOGGER.debug("Screenshot comparison complete. Difference: {:.2f}%", diffPercentage * 100);
+            return diffPercentage;
+        } catch (IOException e) {
+            LOGGER.error("Failed to compare screenshots: {}", e.getMessage());
+            return 1.0; // 100% different in case of error
+        }
+    }
+    
+    /**
+     * Checks if screenshots are similar within a threshold.
+     * 
+     * @param baselinePath The baseline screenshot path
+     * @param actualPath The actual screenshot path
+     * @param threshold The threshold for considering screenshots similar (0.0 to 1.0)
+     * @return True if screenshots are similar within the threshold
+     */
+    public static boolean areScreenshotsSimilar(String baselinePath, String actualPath, double threshold) {
+        double diff = compareScreenshots(baselinePath, actualPath, null, threshold);
+        return diff <= threshold;
+    }
+}
+
+
+
+package com.cssmart.core.config;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.cssmart.core.utils.CSSmartLogger;
+
+/**
+ * Manages configuration properties for the CSSmart framework.
+ * Loads properties from configuration files and system properties.
+ */
+public class PropertyManager implements CSSmartConfig {
+    
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(PropertyManager.class);
+    private static final PropertyManager INSTANCE = new PropertyManager();
+    
+    private static final String DEFAULT_CONFIG_FILE = "cssmart-config.properties";
+    private static final String CUSTOM_CONFIG_FILE_PROPERTY = "cssmart.config.file";
+    
+    private final Map<String, String> properties;
+    private final Map<String, Object> objectProperties;
+    
+    private PropertyManager() {
+        this.properties = new ConcurrentHashMap<>();
+        this.objectProperties = new ConcurrentHashMap<>();
+        
+        // Load properties
+        loadDefaultProperties();
+        loadCustomProperties();
+        loadSystemProperties();
+        
+        LOGGER.info("PropertyManager initialized with {} properties", properties.size());
+    }
+    
+    /**
+     * Get the singleton instance of PropertyManager.
+     * 
+     * @return The PropertyManager instance
+     */
+    public static PropertyManager getInstance() {
+        return INSTANCE;
+    }
+    
+    /**
+     * Load default properties from the default configuration file.
+     */
+    private void loadDefaultProperties() {
+        try {
+            loadPropertiesFromClasspath(DEFAULT_CONFIG_FILE);
+            LOGGER.info("Loaded default properties from {}", DEFAULT_CONFIG_FILE);
+        } catch (Exception e) {
+            LOGGER.warn("Could not load default properties: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Load custom properties from a custom configuration file specified by system property.
+     */
+    private void loadCustomProperties() {
+        String customConfigFile = System.getProperty(CUSTOM_CONFIG_FILE_PROPERTY);
+        if (customConfigFile != null && !customConfigFile.isEmpty()) {
+            try {
+                Path path = Paths.get(customConfigFile);
+                if (Files.exists(path)) {
+                    loadPropertiesFromFile(path.toFile());
+                    LOGGER.info("Loaded custom properties from {}", customConfigFile);
+                } else {
+                    LOGGER.warn("Custom config file not found: {}", customConfigFile);
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Could not load custom properties: {}", e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Load properties from the classpath.
+     * 
+     * @param resourcePath The path to the resource
+     * @throws IOException if an I/O error occurs
+     */
+    private void loadPropertiesFromClasspath(String resourcePath) throws IOException {
+        InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourcePath);
+        if (inputStream != null) {
+            Properties props = new Properties();
+            props.load(inputStream);
+            
+            for (String name : props.stringPropertyNames()) {
+                properties.put(name, props.getProperty(name));
+            }
+            
+            inputStream.close();
+        } else {
+            LOGGER.warn("Resource not found in classpath: {}", resourcePath);
+        }
+    }
+    
+    /**
+     * Load properties from a file.
+     * 
+     * @param file The file to load properties from
+     * @throws IOException if an I/O error occurs
+     */
+    private void loadPropertiesFromFile(File file) throws IOException {
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            Properties props = new Properties();
+            props.load(inputStream);
+            
+            for (String name : props.stringPropertyNames()) {
+                properties.put(name, props.getProperty(name));
+            }
+        }
+    }
+    
+    /**
+     * Load properties from system properties.
+     * System properties override file properties.
+     */
+    private void loadSystemProperties() {
+        Properties systemProps = System.getProperties();
+        for (String name : systemProps.stringPropertyNames()) {
+            // Only override properties that start with "cssmart."
+            if (name.startsWith("cssmart.")) {
+                properties.put(name, systemProps.getProperty(name));
+            }
+        }
+        LOGGER.info("Loaded system properties");
+    }
+    
+    @Override
+    public String getProperty(String key) {
+        return properties.get(key);
+    }
+    
+    @Override
+    public String getProperty(String key, String defaultValue) {
+        return properties.getOrDefault(key, defaultValue);
+    }
+    
+    @Override
+    public int getIntProperty(String key, int defaultValue) {
+        String value = getProperty(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid integer property: {} = {}", key, value);
+            return defaultValue;
+        }
+    }
+    
+    @Override
+    public boolean getBooleanProperty(String key, boolean defaultValue) {
+        String value = getProperty(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        
+        return Boolean.parseBoolean(value);
+    }
+    
+    @Override
+    public double getDoubleProperty(String key, double defaultValue) {
+        String value = getProperty(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid double property: {} = {}", key, value);
+            return defaultValue;
+        }
+    }
+    
+    @Override
+    public long getLongProperty(String key, long defaultValue) {
+        String value = getProperty(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid long property: {} = {}", key, value);
+            return defaultValue;
+        }
+    }
+    
+    @Override
+    public Object getObjectProperty(String key) {
+        return objectProperties.get(key);
+    }
+    
+    @Override
+    public void setProperty(String key, String value) {
+        properties.put(key, value);
+        LOGGER.debug("Set property: {} = {}", key, value);
+    }
+    
+    @Override
+    public void setObjectProperty(String key, Object value) {
+        objectProperties.put(key, value);
+        LOGGER.debug("Set object property: {} = {}", key, value);
+    }
+    
+    @Override
+    public boolean hasProperty(String key) {
+        return properties.containsKey(key);
+    }
+    
+    @Override
+    public boolean hasObjectProperty(String key) {
+        return objectProperties.containsKey(key);
+    }
+    
+    @Override
+    public void removeProperty(String key) {
+        properties.remove(key);
+        LOGGER.debug("Removed property: {}", key);
+    }
+    
+    @Override
+    public void removeObjectProperty(String key) {
+        objectProperties.remove(key);
+        LOGGER.debug("Removed object property: {}", key);
+    }
+    
+    @Override
+    public Map<String, String> getAllProperties() {
+        return new HashMap<>(properties);
+    }
+    
+    @Override
+    public void clear() {
+        properties.clear();
+        objectProperties.clear();
+        LOGGER.info("Cleared all properties");
+    }
+}
+
+
+
+package com.cssmart.core.config;
+
+import java.util.Map;
+
+/**
+ * Interface for configuration management in the CSSmart framework.
+ * Defines methods for getting and setting configuration properties.
+ */
+public interface CSSmartConfig {
+    
+    /**
+     * Get a property value.
+     * 
+     * @param key The property key
+     * @return The property value, or null if not found
+     */
+    String getProperty(String key);
+    
+    /**
+     * Get a property value with a default value.
+     * 
+     * @param key The property key
+     * @param defaultValue The default value to return if property is not found
+     * @return The property value, or defaultValue if not found
+     */
+    String getProperty(String key, String defaultValue);
+    
+    /**
+     * Get an integer property value with a default value.
+     * 
+     * @param key The property key
+     * @param defaultValue The default value to return if property is not found or invalid
+     * @return The property value as an integer, or defaultValue if not found or invalid
+     */
+    int getIntProperty(String key, int defaultValue);
+    
+    /**
+     * Get a boolean property value with a default value.
+     * 
+     * @param key The property key
+     * @param defaultValue The default value to return if property is not found
+     * @return The property value as a boolean, or defaultValue if not found
+     */
+    boolean getBooleanProperty(String key, boolean defaultValue);
+    
+    /**
+     * Get a double property value with a default value.
+     * 
+     * @param key The property key
+     * @param defaultValue The default value to return if property is not found or invalid
+     * @return The property value as a double, or defaultValue if not found or invalid
+     */
+    double getDoubleProperty(String key, double defaultValue);
+    
+    /**
+     * Get a long property value with a default value.
+     * 
+     * @param key The property key
+     * @param defaultValue The default value to return if property is not found or invalid
+     * @return The property value as a long, or defaultValue if not found or invalid
+     */
+    long getLongProperty(String key, long defaultValue);
+    
+    /**
+     * Get an object property value.
+     * 
+     * @param key The property key
+     * @return The property value as an object, or null if not found
+     */
+    Object getObjectProperty(String key);
+    
+    /**
+     * Set a property value.
+     * 
+     * @param key The property key
+     * @param value The property value
+     */
+    void setProperty(String key, String value);
+    
+    /**
+     * Set an object property value.
+     * 
+     * @param key The property key
+     * @param value The property value
+     */
+    void setObjectProperty(String key, Object value);
+    
+    /**
+     * Check if a property exists.
+     * 
+     * @param key The property key
+     * @return True if the property exists, false otherwise
+     */
+    boolean hasProperty(String key);
+    
+    /**
+     * Check if an object property exists.
+     * 
+     * @param key The property key
+     * @return True if the object property exists, false otherwise
+     */
+    boolean hasObjectProperty(String key);
+    
+    /**
+     * Remove a property.
+     * 
+     * @param key The property key
+     */
+    void removeProperty(String key);
+    
+    /**
+     * Remove an object property.
+     * 
+     * @param key The property key
+     */
+    void removeObjectProperty(String key);
+    
+    /**
+     * Get all properties.
+     * 
+     * @return A map of all property keys and values
+     */
+    Map<String, String> getAllProperties();
+    
+    /**
+     * Clear all properties.
+     */
+    void clear();
+}
+
+
+
+package com.cssmart.core.utils;
+
+import java.time.Duration;
+import java.util.function.Function;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.FluentWait;
+import org.openqa.selenium.support.ui.Wait;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import com.cssmart.core.config.PropertyManager;
+
+/**
+ * Utility class for waiting in the CSSmart framework.
+ * Provides methods for common wait operations.
+ */
+public class WaitUtils {
+    
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(WaitUtils.class);
+    
+    private static final String DEFAULT_TIMEOUT = "cssmart.wait.timeout";
+    private static final String DEFAULT_POLL_INTERVAL = "cssmart.wait.poll.interval";
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+    private static final int DEFAULT_POLL_INTERVAL_MILLIS = 500;
+    
+    private WaitUtils() {
+        // Private constructor to prevent instantiation
+    }
+    
+    /**
+     * Wait for the page to be fully loaded.
+     * 
+     * @param driver The WebDriver instance
+     * @return True if the page was loaded within timeout, false otherwise
+     */
+    public static boolean waitForPageLoad(WebDriver driver) {
+        LOGGER.debug("Waiting for page to load");
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            ExpectedCondition<Boolean> pageLoadCondition = new ExpectedCondition<Boolean>() {
+                @Override
+                public Boolean apply(WebDriver driver) {
+                    return ((JavascriptExecutor) driver).executeScript("return document.readyState").equals("complete");
+                }
+            };
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            wait.until(pageLoadCondition);
+            LOGGER.debug("Page loaded successfully");
+            return true;
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for page to load after {} seconds", timeoutSeconds);
+            return false;
+        }
+    }
+    
+    /**
+     * Wait for an element to be visible.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @return The WebElement if found, null otherwise
+     */
+    public static WebElement waitForElementVisible(WebDriver driver, By locator) {
+        LOGGER.debug("Waiting for element to be visible: {}", locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be visible: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be visible with a custom timeout.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @param timeoutSeconds The timeout in seconds
+     * @return The WebElement if found, null otherwise
+     */
+    public static WebElement waitForElementVisible(WebDriver driver, By locator, int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to be visible: {} with timeout: {}s", locator, timeoutSeconds);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be visible: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be clickable.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @return The WebElement if found and clickable, null otherwise
+     */
+    public static WebElement waitForElementClickable(WebDriver driver, By locator) {
+        LOGGER.debug("Waiting for element to be clickable: {}", locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.elementToBeClickable(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be clickable: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be clickable with a custom timeout.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @param timeoutSeconds The timeout in seconds
+     * @return The WebElement if found and clickable, null otherwise
+     */
+    public static WebElement waitForElementClickable(WebDriver driver, By locator, int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to be clickable: {} with timeout: {}s", locator, timeoutSeconds);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.elementToBeClickable(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be clickable: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be present in the DOM.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @return The WebElement if found, null otherwise
+     */
+    public static WebElement waitForElementPresent(WebDriver driver, By locator) {
+        LOGGER.debug("Waiting for element to be present: {}", locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.presenceOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be present: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be present in the DOM with a custom timeout.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @param timeoutSeconds The timeout in seconds
+     * @return The WebElement if found, null otherwise
+     */
+    public static WebElement waitForElementPresent(WebDriver driver, By locator, int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to be present: {} with timeout: {}s", locator, timeoutSeconds);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.presenceOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be present: {}", locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element to be invisible.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @return True if the element became invisible, false otherwise
+     */
+    public static boolean waitForElementInvisible(WebDriver driver, By locator) {
+        LOGGER.debug("Waiting for element to be invisible: {}", locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(ExpectedConditions.invisibilityOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to be invisible: {}", locator);
+            return false;
+        }
+    }
+    
+    /**
+     * Wait for an element to have a specific text.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @param text The expected text
+     * @return The WebElement if found with the expected text, null otherwise
+     */
+    public static WebElement waitForElementText(WebDriver driver, By locator, String text) {
+        LOGGER.debug("Waiting for element to have text '{}': {}", text, locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            wait.until(ExpectedConditions.textToBePresentInElementLocated(locator, text));
+            return driver.findElement(locator);
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to have text '{}': {}", text, locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for an element attribute to have a specific value.
+     * 
+     * @param driver The WebDriver instance
+     * @param locator The element locator
+     * @param attribute The attribute name
+     * @param value The expected attribute value
+     * @return The WebElement if found with the expected attribute value, null otherwise
+     */
+    public static WebElement waitForElementAttribute(WebDriver driver, By locator, String attribute, String value) {
+        LOGGER.debug("Waiting for element to have attribute '{}' with value '{}': {}", attribute, value, locator);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            wait.until(ExpectedConditions.attributeToBe(locator, attribute, value));
+            return driver.findElement(locator);
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for element to have attribute '{}' with value '{}': {}", 
+                    attribute, value, locator);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait until a JavaScript condition is true.
+     * 
+     * @param driver The WebDriver instance
+     * @param javaScript The JavaScript to execute
+     * @return True if the condition became true, false otherwise
+     */
+    public static boolean waitForJavaScriptCondition(WebDriver driver, String javaScript) {
+        LOGGER.debug("Waiting for JavaScript condition: {}", javaScript);
+        
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(new ExpectedCondition<Boolean>() {
+                @Override
+                public Boolean apply(WebDriver driver) {
+                    return (Boolean) ((JavascriptExecutor) driver).executeScript(javaScript);
+                }
+            });
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting for JavaScript condition: {}", javaScript);
+            return false;
+        }
+    }
+    
+    /**
+     * Create a fluent wait with custom settings.
+     * 
+     * @param driver The WebDriver instance
+     * @param timeoutSeconds The timeout in seconds
+     * @param pollingMillis The polling interval in milliseconds
+     * @return A configured Wait instance
+     */
+    public static Wait<WebDriver> createFluentWait(WebDriver driver, int timeoutSeconds, int pollingMillis) {
+        return new FluentWait<>(driver)
+                .withTimeout(Duration.ofSeconds(timeoutSeconds))
+                .pollingEvery(Duration.ofMillis(pollingMillis))
+                .ignoring(NoSuchElementException.class)
+                .ignoring(StaleElementReferenceException.class);
+    }
+    
+    /**
+     * Wait with a custom condition using fluent wait.
+     * 
+     * @param <T> The return type of the wait condition
+     * @param driver The WebDriver instance
+     * @param condition The wait condition
+     * @return The result of the wait condition
+     */
+    public static <T> T waitWithCondition(WebDriver driver, Function<WebDriver, T> condition) {
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        int timeoutSeconds = propertyManager.getIntProperty(DEFAULT_TIMEOUT, DEFAULT_TIMEOUT_SECONDS);
+        int pollingMillis = propertyManager.getIntProperty(DEFAULT_POLL_INTERVAL, DEFAULT_POLL_INTERVAL_MILLIS);
+        
+        Wait<WebDriver> wait = createFluentWait(driver, timeoutSeconds, pollingMillis);
+        
+        try {
+            return wait.until(condition);
+        } catch (TimeoutException e) {
+            LOGGER.warn("Timeout waiting with custom condition");
+            return null;
+        }
+    }
+
+package com.cssmart.core.driver;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import com.cssmart.core.config.PropertyManager;
+import com.cssmart.core.element.CSSmartWebElement;
+import com.cssmart.core.healing.HealingManager;
+import com.cssmart.core.reporting.CSSmartReport;
+import com.cssmart.core.utils.CSSmartLogger;
+import com.cssmart.core.utils.WaitUtils;
+
+/**
+ * Thread-safe WebDriver wrapper for the CSSmart framework.
+ * Provides enhanced capabilities and integrates with framework components.
+ */
+public class CSSmartDriver implements WebDriver, JavascriptExecutor, TakesScreenshot {
+    
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartDriver.class);
+    private static final ConcurrentHashMap<Long, CSSmartDriver> DRIVER_INSTANCES = new ConcurrentHashMap<>();
+    
+    private static final String IMPLICIT_WAIT = "driver.implicit.wait";
+    private static final String PAGE_LOAD_TIMEOUT = "driver.page.load.timeout";
+    private static final String SCRIPT_TIMEOUT = "driver.script.timeout";
+    private static final String DEFAULT_IMPLICIT_WAIT = "5";
+    private static final String DEFAULT_PAGE_LOAD_TIMEOUT = "60";
+    private static final String DEFAULT_SCRIPT_TIMEOUT = "30";
+    
+    private final WebDriver driver;
+    private final PropertyManager propertyManager;
+    private final HealingManager healingManager;
+    private final CSSmartReport report;
+    private final long threadId;
+    
+    /**
+     * Constructs a new CSSmartDriver with the specified WebDriver.
+     * 
+     * @param driver The WebDriver instance to wrap
+     */
+    private CSSmartDriver(WebDriver driver) {
+        this.driver = driver;
+        this.propertyManager = PropertyManager.getInstance();
+        this.healingManager = HealingManager.getInstance();
+        this.report = CSSmartReport.getInstance();
+        this.threadId = Thread.currentThread().getId();
+        
+        // Set timeouts
+        int implicitWait = propertyManager.getIntProperty(IMPLICIT_WAIT, 
+                Integer.parseInt(DEFAULT_IMPLICIT_WAIT));
+        int pageLoadTimeout = propertyManager.getIntProperty(PAGE_LOAD_TIMEOUT, 
+                Integer.parseInt(DEFAULT_PAGE_LOAD_TIMEOUT));
+        int scriptTimeout = propertyManager.getIntProperty(SCRIPT_TIMEOUT, 
+                Integer.parseInt(DEFAULT_SCRIPT_TIMEOUT));
+        
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(implicitWait));
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(pageLoadTimeout));
+        driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(scriptTimeout));
+        
+        LOGGER.info("Initialized CSSmartDriver with timeouts: implicitWait={}s, pageLoadTimeout={}s, scriptTimeout={}s", 
+                implicitWait, pageLoadTimeout, scriptTimeout);
+    }
+    
+    /**
+     * Creates or retrieves a CSSmartDriver instance for the current thread.
+     * 
+     * @param driver The WebDriver instance to wrap
+     * @return The CSSmartDriver instance
+     */
+    public static synchronized CSSmartDriver getInstance(WebDriver driver) {
+        long threadId = Thread.currentThread().getId();
+        
+        if (DRIVER_INSTANCES.containsKey(threadId)) {
+            LOGGER.debug("Returning existing CSSmartDriver instance for thread {}", threadId);
+            return DRIVER_INSTANCES.get(threadId);
+        }
+        
+        LOGGER.info("Creating new CSSmartDriver instance for thread {}", threadId);
+        CSSmartDriver cssmartDriver = new CSSmartDriver(driver);
+        DRIVER_INSTANCES.put(threadId, cssmartDriver);
+        return cssmartDriver;
+    }
+    
+    /**
+     * Retrieves the CSSmartDriver instance for the current thread.
+     * 
+     * @return The CSSmartDriver instance, or null if not found
+     */
+    public static synchronized CSSmartDriver getInstance() {
+        long threadId = Thread.currentThread().getId();
+        return DRIVER_INSTANCES.get(threadId);
+    }
+    
+    /**
+     * Removes the CSSmartDriver instance for the current thread.
+     */
+    public static synchronized void removeInstance() {
+        long threadId = Thread.currentThread().getId();
+        
+        if (DRIVER_INSTANCES.containsKey(threadId)) {
+            LOGGER.info("Removing CSSmartDriver instance for thread {}", threadId);
+            DRIVER_INSTANCES.remove(threadId);
+        }
+    }
+    
+    /**
+     * Get the wrapped WebDriver instance.
+     * 
+     * @return The WebDriver instance
+     */
+    public WebDriver getWrappedDriver() {
+        return driver;
+    }
+    
+    /**
+     * Get browser capabilities.
+     * 
+     * @return The browser capabilities
+     */
+    public Capabilities getCapabilities() {
+        if (driver instanceof RemoteWebDriver) {
+            return ((RemoteWebDriver) driver).getCapabilities();
+        }
+        return null;
+    }
+    
+    /**
+     * Create a WebDriverWait instance with default timeout.
+     * 
+     * @return The WebDriverWait instance
+     */
+    public WebDriverWait createWait() {
+        int timeoutSeconds = propertyManager.getIntProperty("cssmart.wait.timeout", 30);
+        return new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+    }
+    
+    /**
+     * Create a WebDriverWait instance with custom timeout.
+     * 
+     * @param timeoutSeconds The timeout in seconds
+     * @return The WebDriverWait instance
+     */
+    public WebDriverWait createWait(int timeoutSeconds) {
+        return new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+    }
+    
+    /**
+     * Create an Actions instance.
+     * 
+     * @return The Actions instance
+     */
+    public Actions createActions() {
+        return new Actions(driver);
+    }
+    
+    /**
+     * Wait for the page to be fully loaded.
+     */
+    public void waitForPageLoad() {
+        WaitUtils.waitForPageLoad(driver);
+    }
+    
+    /**
+     * Find an element with self-healing capabilities.
+     * 
+     * @param by The element locator
+     * @param description Human-readable description of the element
+     * @return The CSSmartWebElement
+     */
+    public CSSmartWebElement findElement(By by, String description) {
+        LOGGER.debug("Finding element: {} with description: {}", by, description);
+        
+        try {
+            WebElement element = driver.findElement(by);
+            return new CSSmartWebElement(driver, element, description);
+        } catch (Exception e) {
+            LOGGER.debug("Element not found with standard locator, attempting self-healing", e);
+            
+            // Try self-healing
+            WebElement healedElement = healingManager.healElement(driver, by, description)
+                    .orElseThrow(() -> e);
+            
+            return new CSSmartWebElement(driver, healedElement, description);
+        }
+    }
+    
+    // WebDriver interface implementation
+    
+    @Override
+    public void get(String url) {
+        LOGGER.info("Navigating to URL: {}", url);
+        report.logInfo("Navigating to URL: " + url);
+        driver.get(url);
+        waitForPageLoad();
+    }
+    
+    @Override
+    public String getCurrentUrl() {
+        String url = driver.getCurrentUrl();
+        LOGGER.debug("Current URL: {}", url);
+        return url;
+    }
+    
+    @Override
+    public String getTitle() {
+        String title = driver.getTitle();
+        LOGGER.debug("Page title: {}", title);
+        return title;
+    }
+    
+    @Override
+    public List<WebElement> findElements(By by) {
+        LOGGER.debug("Finding elements: {}", by);
+        return driver.findElements(by);
+    }
+    
+    @Override
+    public WebElement findElement(By by) {
+        LOGGER.debug("Finding element: {}", by);
+        return driver.findElement(by);
+    }
+    
+    @Override
+    public String getPageSource() {
+        LOGGER.debug("Getting page source");
+        return driver.getPageSource();
+    }
+    
+    @Override
+    public void close() {
+        LOGGER.info("Closing browser window");
+        driver.close();
+    }
+    
+    @Override
+    public void quit() {
+        LOGGER.info("Quitting browser");
+        driver.quit();
+        removeInstance();
+    }
+    
+    @Override
+    public Set<String> getWindowHandles() {
+        LOGGER.debug("Getting window handles");
+        return driver.getWindowHandles();
+    }
+    
+    @Override
+    public String getWindowHandle() {
+        LOGGER.debug("Getting current window handle");
+        return driver.getWindowHandle();
+    }
+    
+    @Override
+    public TargetLocator switchTo() {
+        LOGGER.debug("Switching to");
+        return driver.switchTo();
+    }
+    
+    @Override
+    public Navigation navigate() {
+        LOGGER.debug("Navigating");
+        return driver.navigate();
+    }
+    
+    @Override
+    public Options manage() {
+        LOGGER.debug("Managing");
+        return driver.manage();
+    }
+    
+    // JavascriptExecutor interface implementation
+    
+    @Override
+    public Object executeScript(String script, Object... args) {
+        LOGGER.debug("Executing JavaScript: {}", script);
+        return ((JavascriptExecutor) driver).executeScript(script, args);
+    }
+    
+    @Override
+    public Object executeAsyncScript(String script, Object... args) {
+        LOGGER.debug("Executing asynchronous JavaScript: {}", script);
+        return ((JavascriptExecutor) driver).executeAsyncScript(script, args);
+    }
+    
+    // TakesScreenshot interface implementation
+    
+    @Override
+    public <X> X getScreenshotAs(OutputType<X> target) {
+        LOGGER.debug("Taking screenshot");
+        return ((TakesScreenshot) driver).getScreenshotAs(target);
+    }
+    
+    /**
+     * Take a screenshot and log it in the report.
+     * 
+     * @param screenshotName The screenshot name
+     * @return The path to the saved screenshot
+     */
+    public String takeScreenshot(String screenshotName) {
+        LOGGER.debug("Taking screenshot: {}", screenshotName);
+        return report.captureScreenshot(driver, screenshotName);
+    }
+}
+
+
+package com.cssmart.core.element;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Enhanced element locator annotation for the CSSmart framework.
+ * Extends standard FindBy with additional healing information.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.TYPE})
+public @interface CSSmartFindBy {
+    
+    /**
+     * Element ID locator.
+     * 
+     * @return The element ID
+     */
+    String id() default "";
+    
+    /**
+     * Element name locator.
+     * 
+     * @return The element name
+     */
+    String name() default "";
+    
+    /**
+     * Element class name locator.
+     * 
+     * @return The element class name
+     */
+    String className() default "";
+    
+    /**
+     * Element tag name locator.
+     * 
+     * @return The element tag name
+     */
+    String tagName() default "";
+    
+    /**
+     * Link text locator.
+     * 
+     * @return The link text
+     */
+    String linkText() default "";
+    
+    /**
+     * Partial link text locator.
+     * 
+     * @return The partial link text
+     */
+    String partialLinkText() default "";
+    
+    /**
+     * CSS selector locator.
+     * 
+     * @return The CSS selector
+     */
+    String css() default "";
+    
+    /**
+     * XPath locator.
+     * 
+     * @return The XPath
+     */
+    String xpath() default "";
+    
+    /**
+     * Human-readable description of the element.
+     * Used for self-healing and reporting.
+     * 
+     * @return The element description
+     */
+    String description() default "";
+    
+    /**
+     * Element type for improved healing.
+     * E.g., button, textbox, checkbox, etc.
+     * 
+     * @return The element type
+     */
+    String elementType() default "";
+    
+    /**
+     * Alternative locators for self-healing.
+     * 
+     * @return Array of alternative locators
+     */
+    String[] alternativeLocators() default {};
+    
+    /**
+     * Expected element text for verification.
+     * 
+     * @return The expected text
+     */
+    String expectedText() default "";
+    
+    /**
+     * Critical flag for important elements.
+     * Critical elements will have additional validation and logging.
+     * 
+     * @return True if the element is critical
+     */
+    boolean critical() default false;
+    
+    /**
+     * Wait timeout for this specific element.
+     * Overrides the default timeout.
+     * 
+     * @return The wait timeout in seconds
+     */
+    int timeout() default -1;
+}
+
+
+package com.cssmart.core.element;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.Point;
+import org.openqa.selenium.Rectangle;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import com.cssmart.core.config.PropertyManager;
+import com.cssmart.core.healing.HealingManager;
+import com.cssmart.core.reporting.CSSmartReport;
+import com.cssmart.core.utils.CSSmartLogger;
+import com.cssmart.core.utils.CSSmartScreenshot;
+
+/**
+ * Enhanced WebElement wrapper for the CSSmart framework.
+ * Provides additional functionality and self-healing capabilities.
+ */
+public class CSSmartWebElement implements WebElement {
+    
+    private static final CSSmartLogger LOGGER = CSSmartLogger.getLogger(CSSmartWebElement.class);
+    
+    private final WebDriver driver;
+    private WebElement element;
+    private final String description;
+    private final HealingManager healingManager;
+    private final CSSmartReport report;
+    private final PropertyManager propertyManager;
+    
+    /**
+     * Constructs a new CSSmartWebElement.
+     * 
+     * @param driver The WebDriver instance
+     * @param element The WebElement to wrap
+     * @param description Human-readable description of the element
+     */
+    public CSSmartWebElement(WebDriver driver, WebElement element, String description) {
+        this.driver = driver;
+        this.element = element;
+        this.description = description;
+        this.healingManager = HealingManager.getInstance();
+        this.report = CSSmartReport.getInstance();
+        this.propertyManager = PropertyManager.getInstance();
+        
+        LOGGER.debug("Created CSSmartWebElement: {}", description);
+    }
+    
+    /**
+     * Get the human-readable description of the element.
+     * 
+     * @return The element description
+     */
+    public String getDescription() {
+        return description;
+    }
+    
+    /**
+     * Get the wrapped WebElement.
+     * 
+     * @return The WebElement
+     */
+    public WebElement getWrappedElement() {
+        return element;
+    }
+    
+    /**
+     * Highlight the element on the page.
+     * 
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement highlight() {
+        try {
+            JavascriptExecutor js = (JavascriptExecutor) driver;
+            String originalStyle = (String) js.executeScript("return arguments[0].getAttribute('style')", element);
+            js.executeScript(
+                    "arguments[0].setAttribute('style', 'border: 2px solid red; background-color: yellow;')",
+                    element);
+            
+            // Wait a moment for the highlight to be visible
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Restore original style
+            js.executeScript("arguments[0].setAttribute('style', arguments[1])", element, originalStyle);
+            
+            LOGGER.debug("Highlighted element: {}", description);
+        } catch (Exception e) {
+            LOGGER.warn("Could not highlight element: {}", description, e);
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Wait for the element to be visible.
+     * 
+     * @param timeoutSeconds The timeout in seconds
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement waitForVisible(int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to be visible: {}", description);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            wait.until(ExpectedConditions.visibilityOf(element));
+            LOGGER.debug("Element is now visible: {}", description);
+        } catch (Exception e) {
+            LOGGER.warn("Timeout waiting for element to be visible: {}", description, e);
+            
+            // Take screenshot for debugging
+            report.captureScreenshot(driver, "ElementNotVisible_" + description);
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Wait for the element to be clickable.
+     * 
+     * @param timeoutSeconds The timeout in seconds
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement waitForClickable(int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to be clickable: {}", description);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            wait.until(ExpectedConditions.elementToBeClickable(element));
+            LOGGER.debug("Element is now clickable: {}", description);
+        } catch (Exception e) {
+            LOGGER.warn("Timeout waiting for element to be clickable: {}", description, e);
+            
+            // Take screenshot for debugging
+            report.captureScreenshot(driver, "ElementNotClickable_" + description);
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Scroll the element into view.
+     * 
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement scrollIntoView() {
+        LOGGER.debug("Scrolling element into view: {}", description);
+        
+        try {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element);
+            
+            // Wait a moment for scrolling to complete
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            LOGGER.debug("Element scrolled into view: {}", description);
+        } catch (Exception e) {
+            LOGGER.warn("Could not scroll element into view: {}", description, e);
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Take a screenshot of the element.
+     * 
+     * @param screenshotName The screenshot name
+     * @return The path to the saved screenshot
+     */
+    public String takeScreenshot(String screenshotName) {
+        LOGGER.debug("Taking screenshot of element: {}", description);
+        
+        try {
+            // First scroll the element into view
+            scrollIntoView();
+            
+            // Then take the screenshot
+            String fileName = screenshotName + "_" + description;
+            String filePath = propertyManager.getProperty("report.dir", "target/cssmart-reports") + 
+                    "/screenshots/" + fileName + ".png";
+            
+            CSSmartScreenshot.captureElement(driver, element, filePath);
+            LOGGER.debug("Element screenshot saved to: {}", filePath);
+            
+            return filePath;
+        } catch (Exception e) {
+            LOGGER.warn("Could not take element screenshot: {}", description, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Perform JavaScript click on the element.
+     * Useful when normal click doesn't work.
+     * 
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement jsClick() {
+        LOGGER.debug("Performing JavaScript click on element: {}", description);
+        
+        try {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
+            report.logInfo("Clicked on " + description + " using JavaScript");
+        } catch (Exception e) {
+            LOGGER.error("Failed to perform JavaScript click on element: {}", description, e);
+            report.logFail("Failed to click on " + description + " using JavaScript");
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Set the value of the element using JavaScript.
+     * Useful for hidden inputs or when sendKeys doesn't work.
+     * 
+     * @param value The value to set
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement jsSetValue(String value) {
+        LOGGER.debug("Setting value '{}' on element using JavaScript: {}", value, description);
+        
+        try {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", element, value);
+            report.logInfo("Set value '" + value + "' on " + description + " using JavaScript");
+        } catch (Exception e) {
+            LOGGER.error("Failed to set value using JavaScript on element: {}", description, e);
+            report.logFail("Failed to set value on " + description + " using JavaScript");
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Check if the element is displayed and return true/false without throwing an exception.
+     * 
+     * @return True if the element is displayed, false otherwise
+     */
+    public boolean isDisplayedSafely() {
+        try {
+            return element.isDisplayed();
+        } catch (Exception e) {
+            LOGGER.debug("Element is not displayed: {}", description);
+            return false;
+        }
+    }
+    
+    /**
+     * Check if the element is enabled and return true/false without throwing an exception.
+     * 
+     * @return True if the element is enabled, false otherwise
+     */
+    public boolean isEnabledSafely() {
+        try {
+            return element.isEnabled();
+        } catch (Exception e) {
+            LOGGER.debug("Could not check if element is enabled: {}", description);
+            return false;
+        }
+    }
+    
+    /**
+     * Check if the element is selected and return true/false without throwing an exception.
+     * 
+     * @return True if the element is selected, false otherwise
+     */
+    public boolean isSelectedSafely() {
+        try {
+            return element.isSelected();
+        } catch (Exception e) {
+            LOGGER.debug("Could not check if element is selected: {}", description);
+            return false;
+        }
+    }
+    
+    /**
+     * Get the text of the element and return empty string without throwing an exception.
+     * 
+     * @return The element text, or empty string if not available
+     */
+    public String getTextSafely() {
+        try {
+            return element.getText();
+        } catch (Exception e) {
+            LOGGER.debug("Could not get text of element: {}", description);
+            return "";
+        }
+    }
+    
+    /**
+     * Get the attribute value of the element and return null without throwing an exception.
+     * 
+     * @param name The attribute name
+     * @return The attribute value, or null if not available
+     */
+    public String getAttributeSafely(String name) {
+        try {
+            return element.getAttribute(name);
+        } catch (Exception e) {
+            LOGGER.debug("Could not get attribute '{}' of element: {}", name, description);
+            return null;
+        }
+    }
+    
+    /**
+     * Wait for the element to have a specific text.
+     * 
+     * @param text The expected text
+     * @param timeoutSeconds The timeout in seconds
+     * @return True if the element has the expected text within the timeout
+     */
+    public boolean waitForText(String text, int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to have text '{}': {}", text, description);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(driver -> element.getText().contains(text));
+        } catch (Exception e) {
+            LOGGER.warn("Timeout waiting for element to have text '{}': {}", text, description);
+            return false;
+        }
+    }
+    
+    /**
+     * Wait for the element to have a specific attribute value.
+     * 
+     * @param attribute The attribute name
+     * @param value The expected attribute value
+     * @param timeoutSeconds The timeout in seconds
+     * @return True if the element has the expected attribute value within the timeout
+     */
+    public boolean waitForAttribute(String attribute, String value, int timeoutSeconds) {
+        LOGGER.debug("Waiting for element to have attribute '{}' with value '{}': {}", 
+                attribute, value, description);
+        
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            return wait.until(driver -> value.equals(element.getAttribute(attribute)));
+        } catch (Exception e) {
+            LOGGER.warn("Timeout waiting for element to have attribute '{}' with value '{}': {}", 
+                    attribute, value, description);
+            return false;
+        }
+    }
+    
+    /**
+     * Move to the element.
+     * 
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement moveTo() {
+        LOGGER.debug("Moving to element: {}", description);
+        
+        try {
+            Actions actions = new Actions(driver);
+            actions.moveToElement(element).perform();
+            LOGGER.debug("Moved to element: {}", description);
+        } catch (Exception e) {
+            LOGGER.warn("Could not move to element: {}", description, e);
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Click the element with retry logic.
+     * 
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement clickWithRetry() {
+        return clickWithRetry(3);
+    }
+    
+    /**
+     * Click the element with retry logic.
+     * 
+     * @param maxRetries The maximum number of retries
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement clickWithRetry(int maxRetries) {
+        LOGGER.debug("Clicking element with retry: {}", description);
+        
+        Exception lastException = null;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Try scrolling into view first
+                scrollIntoView();
+                
+                // Then try to click
+                click();
+                
+                LOGGER.debug("Successfully clicked element on attempt {}: {}", attempt, description);
+                report.logPass("Clicked on " + description);
+                return this;
+            } catch (StaleElementReferenceException e) {
+                // Handle stale element by trying to find it again
+                try {
+                    LOGGER.debug("Element is stale, trying to relocate it: {}", description);
+                    By locator = getLocatorFromElement();
+                    if (locator != null) {
+                        element = driver.findElement(locator);
+                    } else {
+                        element = driver.findElements(By.xpath("//*")).stream()
+                                .filter(el -> {
+                                    try {
+                                        return description.equals(el.getText()) || 
+                                               description.equals(el.getAttribute("id")) ||
+                                               description.equals(el.getAttribute("name"));
+                                    } catch (Exception ex) {
+                                        return false;
+                                    }
+                                })
+                                .findFirst()
+                                .orElseThrow(() -> new Exception("Could not relocate element: " + description));
+                    }
+                } catch (Exception relocateEx) {
+                    lastException = relocateEx;
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Click attempt {} failed for element: {}", attempt, description, e);
+                lastException = e;
+                
+                // Wait a moment before retrying
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                // Try JavaScript click as an alternative
+                if (attempt == maxRetries - 1) {
+                    try {
+                        LOGGER.debug("Trying JavaScript click as an alternative");
+                        jsClick();
+                        LOGGER.debug("Successfully clicked element using JavaScript: {}", description);
+                        report.logPass("Clicked on " + description + " using JavaScript");
+                        return this;
+                    } catch (Exception jsEx) {
+                        LOGGER.warn("JavaScript click also failed for element: {}", description, jsEx);
+                    }
+                }
+            }
+        }
+        
+        // If we got here, all attempts failed
+        LOGGER.error("Failed to click element after {} attempts: {}", maxRetries, description, lastException);
+        report.logFailWithScreenshot(driver, "Failed to click on " + description + " after " + maxRetries + " attempts");
+        
+        throw new WebDriverException("Failed to click element after " + maxRetries + " attempts: " + description, lastException);
+    }
+    
+    /**
+     * Send keys to the element with retry logic.
+     * 
+     * @param text The text to send
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement sendKeysWithRetry(CharSequence... text) {
+        return sendKeysWithRetry(3, text);
+    }
+    
+    /**
+     * Send keys to the element with retry logic.
+     * 
+     * @param maxRetries The maximum number of retries
+     * @param text The text to send
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement sendKeysWithRetry(int maxRetries, CharSequence... text) {
+        LOGGER.debug("Sending keys to element with retry: {}", description);
+        
+        String textValue = text != null ? String.join("", text) : "";
+        // Mask password if the element is a password field
+        String logValue = isPasswordField() ? "********" : textValue;
+        
+        Exception lastException = null;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Try scrolling into view first
+                scrollIntoView();
+                
+                // Then try to send keys
+                clear();
+                sendKeys(text);
+                
+                LOGGER.debug("Successfully sent keys on attempt {}: {}", attempt, description);
+                report.logPass("Entered '" + logValue + "' in " + description);
+                return this;
+            } catch (StaleElementReferenceException e) {
+                // Handle stale element by trying to find it again
+                try {
+                    LOGGER.debug("Element is stale, trying to relocate it: {}", description);
+                    By locator = getLocatorFromElement();
+                    if (locator != null) {
+                        element = driver.findElement(locator);
+                    } else {
+                        // Try to find by various attributes
+                        element = driver.findElements(By.xpath("//input"))
+                                .stream()
+                                .filter(el -> {
+                                    try {
+                                        return description.equals(el.getAttribute("placeholder")) || 
+                                               description.equals(el.getAttribute("id")) ||
+                                               description.equals(el.getAttribute("name"));
+                                    } catch (Exception ex) {
+                                        return false;
+                                    }
+                                })
+                                .findFirst()
+                                .orElseThrow(() -> new Exception("Could not relocate element: " + description));
+                    }
+                } catch (Exception relocateEx) {
+                    lastException = relocateEx;
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Send keys attempt {} failed for element: {}", attempt, description, e);
+                lastException = e;
+                
+                // Wait a moment before retrying
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                // Try JavaScript as an alternative
+                if (attempt == maxRetries - 1) {
+                    try {
+                        LOGGER.debug("Trying JavaScript to set value as an alternative");
+                        jsSetValue(textValue);
+                        LOGGER.debug("Successfully set value using JavaScript: {}", description);
+                        report.logPass("Entered '" + logValue + "' in " + description + " using JavaScript");
+                        return this;
+                    } catch (Exception jsEx) {
+                        LOGGER.warn("JavaScript set value also failed for element: {}", description, jsEx);
+                    }
+                }
+            }
+        }
+        
+        // If we got here, all attempts failed
+        LOGGER.error("Failed to send keys to element after {} attempts: {}", maxRetries, description, lastException);
+        report.logFailWithScreenshot(driver, "Failed to enter text in " + description + " after " + maxRetries + " attempts");
+        
+        throw new WebDriverException("Failed to send keys to element after " + maxRetries + " attempts: " + description, lastException);
+    }
+    
+    /**
+     * Clear and send keys to the element.
+     * 
+     * @param text The text to send
+     * @return This CSSmartWebElement for method chaining
+     */
+    public CSSmartWebElement clearAndSendKeys(CharSequence... text) {
+        LOGGER.debug("Clearing and sending keys to element: {}", description);
+        
+        try {
+            clear();
+            sendKeys(text);
+            
+            String textValue = text != null ? String.join("", text) : "";
+            // Mask password if the element is a password field
+            String logValue = isPasswordField() ? "********" : textValue;
+            
+            LOGGER.debug("Successfully cleared and sent keys to element: {}", description);
+            report.logPass("Cleared and entered '" + logValue + "' in " + description);
+        } catch (Exception e) {
+            LOGGER.error("Failed to clear and send keys to element: {}", description, e);
+            report.logFailWithScreenshot(driver, "Failed to clear and enter text in " + description);
+            throw e;
+        }
+        
+        return this;
+    }
+    
+    /**
+     * Check if the element is a password field.
+     * 
+     * @return True if the element is a password field
+     */
+    private boolean isPasswordField() {
+        try {
+            String type = element.getAttribute("type");
+            return "password".equalsIgnoreCase(type);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Try to get a locator from an element.
+     * 
+     * @return A By locator, or null if not found
+     */
+    private By getLocatorFromElement() {
+        try {
+            String id = element.getAttribute("id");
+            if (id != null && !id.isEmpty()) {
+                return By.id(id);
+            }
+            
+            String name = element.getAttribute("name");
+            if (name != null && !name.isEmpty()) {
+                return By.name(name);
+            }
+            
+            String className = element.getAttribute("class");
+            if (className != null && !className.isEmpty()) {
+                return By.className(className);
+            }
+            
+            // More sophisticated approaches could be added here
+            
+            return null;
+        } catch (Exception e) {
+            LOGGER.debug("Could not get locator from element: {}", description);
+            return null;
+        }
+    }
+    
+    // WebElement interface implementation
+    
+    @Override
+    public void click() {
+        LOGGER.debug("Clicking on element: {}", description);
+        try {
+            element.click();
+            report.logInfo("Clicked on " + description);
+        } catch (Exception e) {
+            LOGGER.error("Failed to click on element: {}", description, e);
+            report.logFailWithScreenshot(driver, "Failed to click on " + description);
+            throw e;
+        }
+    }
+    
+    @Override
+    public void submit() {
+        LOGGER.debug("Submitting form with element: {}", description);
+        try {
+            element.submit();
+            report.logInfo("Submitted form with " + description);
+        } catch (Exception e) {
+            LOGGER.error("Failed to submit form with element: {}", description, e);
+            report.logFailWithScreenshot(driver, "Failed to submit form with " + description);
+            throw e;
+        }
+    }
+    
+    @Override
+    public void sendKeys(CharSequence... keysToSend) {
+        String textValue = keysToSend != null ? String.join("", keysToSend) : "";
+        // Mask password if the element is a password field
+        String logValue = isPasswordField() ? "********" : textValue;
+        
+        LOGGER.debug("Sending keys to element: {}", description);
+        try {
+            element.sendKeys(keysToSend);
+            report.logInfo("Entered '" + logValue + "' in " + description);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send keys to element: {}", description, e);
+            report.logFailWithScreenshot(driver, "Failed to enter text in " + description);
+            throw e;
+        }
+    }
+    
+    @Override
+    public void clear() {
+        LOGGER.debug("Clearing element: {}", description);
+        try {
+            element.clear();
+            report.logInfo("Cleared " + description);
+        } catch (Exception e) {
+            LOGGER.error("Failed to clear element: {}", description, e);
+            report.logFailWithScreenshot(driver, "Failed to clear " + description);
+            throw e;
+        }
+    }
+    
+    @Override
+    public String getTagName() {
+        try {
+            return element.getTagName();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get tag name of element: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public String getAttribute(String name) {
+        try {
+            return element.getAttribute(name);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get attribute '{}' of element: {}", name, description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public boolean isSelected() {
+        try {
+            return element.isSelected();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to check if element is selected: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public boolean isEnabled() {
+        try {
+            return element.isEnabled();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to check if element is enabled: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public String getText() {
+        try {
+            return element.getText();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get text of element: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public List<WebElement> findElements(By by) {
+        try {
+            List<WebElement> elements = element.findElements(by);
+            return elements.stream()
+                    .map(el -> new CSSmartWebElement(driver, el, description + " > " + by))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to find elements within element: {} > {}", description, by, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public WebElement findElement(By by) {
+        try {
+            WebElement foundElement = element.findElement(by);
+            return new CSSmartWebElement(driver, foundElement, description + " > " + by);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to find element within element: {} > {}", description, by, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public boolean isDisplayed() {
+        try {
+            return element.isDisplayed();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to check if element is displayed: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public Point getLocation() {
+        try {
+            return element.getLocation();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get location of element: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public Dimension getSize() {
+        try {
+            return element.getSize();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get size of element: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public Rectangle getRect() {
+        try {
+            return element.getRect();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get rectangle of element: {}", description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public String getCssValue(String propertyName) {
+        try {
+            return element.getCssValue(propertyName);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get CSS value '{}' of element: {}", propertyName, description, e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public <X> X getScreenshotAs(OutputType<X> target) throws WebDriverException {
+        try {
+            return element.getScreenshotAs(target);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get screenshot of element: {}", description, e);
+            throw e;
+        }
+    }
+}
+
+
