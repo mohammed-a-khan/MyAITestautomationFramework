@@ -1,0 +1,627 @@
+package com.cssmart.core.driver;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.edge.EdgeDriver;
+import org.openqa.selenium.edge.EdgeOptions;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
+import org.openqa.selenium.safari.SafariDriver;
+import org.openqa.selenium.safari.SafariOptions;
+
+import com.cssmart.core.config.CSSmartConfig;
+import com.cssmart.core.config.PropertyManager;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * Browser factory implementation for the CSSmart framework.
+ * Creates and configures WebDriver instances based on specified browser types.
+ */
+@Slf4j
+public class BrowserManager {
+    
+    private static final String BROWSER_TYPE = "browser.type";
+    private static final String HEADLESS = "browser.headless";
+    private static final String CHROME = "chrome";
+    private static final String FIREFOX = "firefox";
+    private static final String EDGE = "edge";
+    private static final String SAFARI = "safari";
+    
+    private PropertyManager propertyManager;
+    
+    public BrowserManager() {
+        this.propertyManager = PropertyManager.getInstance();
+    }
+    
+    /**
+     * Creates a WebDriver instance based on configuration.
+     * 
+     * @return WebDriver instance of specified browser type
+     */
+    public WebDriver createDriver() {
+        String browserType = propertyManager.getProperty(BROWSER_TYPE, CHROME);
+        boolean headless = Boolean.parseBoolean(propertyManager.getProperty(HEADLESS, "false"));
+        
+        log.info("Creating WebDriver for browser: {}, headless: {}", browserType, headless);
+        
+        switch (browserType.toLowerCase()) {
+            case CHROME:
+                return createChromeDriver(headless);
+            case FIREFOX:
+                return createFirefoxDriver(headless);
+            case EDGE:
+                return createEdgeDriver(headless);
+            case SAFARI:
+                return createSafariDriver();
+            default:
+                log.warn("Unknown browser type: {}. Defaulting to Chrome.", browserType);
+                return createChromeDriver(headless);
+        }
+    }
+    
+    private WebDriver createChromeDriver(boolean headless) {
+        ChromeOptions options = new ChromeOptions();
+        if (headless) {
+            options.addArguments("--headless=new");
+        }
+        options.addArguments("--start-maximized");
+        options.addArguments("--disable-notifications");
+        options.addArguments("--remote-allow-origins=*");
+        
+        return new ChromeDriver(options);
+    }
+    
+    private WebDriver createFirefoxDriver(boolean headless) {
+        FirefoxOptions options = new FirefoxOptions();
+        if (headless) {
+            options.addArguments("-headless");
+        }
+        
+        return new FirefoxDriver(options);
+    }
+    
+    private WebDriver createEdgeDriver(boolean headless) {
+        EdgeOptions options = new EdgeOptions();
+        if (headless) {
+            options.addArguments("--headless=new");
+        }
+        options.addArguments("--start-maximized");
+        
+        return new EdgeDriver(options);
+    }
+    
+    private WebDriver createSafariDriver() {
+        SafariOptions options = new SafariOptions();
+        // Safari doesn't support headless mode
+        
+        return new SafariDriver(options);
+    }
+}
+
+
+
+package com.cssmart.core.healing;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+import com.cssmart.core.config.PropertyManager;
+import com.cssmart.core.element.CSSmartWebElement;
+import com.cssmart.core.reporting.CSSmartReport;
+import com.cssmart.ai.CSSmartAIElementFinder;
+import com.cssmart.ai.visual.VisualElementFinder;
+
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * The HealingManager orchestrates the self-healing process for broken locators.
+ * It attempts various strategies to find elements when the original locator fails.
+ */
+@Slf4j
+public class HealingManager {
+    private static final HealingManager INSTANCE = new HealingManager();
+    
+    private final HealingHistory healingHistory;
+    private final LocatorHealer locatorHealer;
+    private final ElementDescriptionAnalyzer descriptionAnalyzer;
+    private final CSSmartAIElementFinder aiElementFinder;
+    private final VisualElementFinder visualElementFinder;
+    
+    private final boolean enableHealing;
+    private final boolean enableLearning;
+    
+    private HealingManager() {
+        PropertyManager propertyManager = PropertyManager.getInstance();
+        this.enableHealing = Boolean.parseBoolean(propertyManager.getProperty("cssmart.healing.enabled", "true"));
+        this.enableLearning = Boolean.parseBoolean(propertyManager.getProperty("cssmart.healing.learning.enabled", "true"));
+        
+        this.healingHistory = new HealingHistory();
+        this.locatorHealer = new LocatorHealer();
+        this.descriptionAnalyzer = new ElementDescriptionAnalyzer();
+        this.aiElementFinder = new CSSmartAIElementFinder();
+        this.visualElementFinder = new VisualElementFinder();
+    }
+    
+    public static HealingManager getInstance() {
+        return INSTANCE;
+    }
+    
+    /**
+     * Attempts to heal a broken locator and find the element.
+     * 
+     * @param driver The WebDriver instance
+     * @param originalLocator The original locator that failed
+     * @param elementDescription Human-readable description of the element
+     * @return Optional containing the WebElement if found, empty otherwise
+     */
+    public Optional<WebElement> healElement(WebDriver driver, By originalLocator, String elementDescription) {
+        if (!enableHealing) {
+            log.debug("Self-healing is disabled");
+            return Optional.empty();
+        }
+        
+        log.info("Starting healing process for locator: {} with description: {}", originalLocator, elementDescription);
+        CSSmartReport.getInstance().logInfo("Attempting to heal broken locator: " + originalLocator);
+        
+        // First check if we have a successful healing strategy from history
+        Optional<WebElement> element = tryHealingFromHistory(driver, originalLocator);
+        if (element.isPresent()) {
+            return element;
+        }
+        
+        // Try alternative locator strategies
+        element = tryAlternativeLocators(driver, originalLocator, elementDescription);
+        if (element.isPresent()) {
+            return element;
+        }
+        
+        // Try AI-based element finding if we have a description
+        if (elementDescription != null && !elementDescription.isEmpty()) {
+            element = tryAIElementFinding(driver, elementDescription);
+            if (element.isPresent()) {
+                return element;
+            }
+        }
+        
+        // Last resort: visual element finding
+        element = tryVisualElementFinding(driver, elementDescription);
+        
+        if (element.isPresent()) {
+            log.info("Successfully healed element");
+            CSSmartReport.getInstance().logSuccess("Element healed successfully");
+        } else {
+            log.info("Failed to heal element");
+            CSSmartReport.getInstance().logWarning("Failed to heal broken locator");
+        }
+        
+        return element;
+    }
+    
+    private Optional<WebElement> tryHealingFromHistory(WebDriver driver, By originalLocator) {
+        log.debug("Trying healing from history for: {}", originalLocator);
+        
+        List<By> historicalLocators = healingHistory.getSuccessfulLocators(originalLocator);
+        for (By historicalLocator : historicalLocators) {
+            try {
+                WebElement element = driver.findElement(historicalLocator);
+                log.info("Element found using historical locator: {}", historicalLocator);
+                return Optional.of(element);
+            } catch (NoSuchElementException e) {
+                log.debug("Historical locator failed: {}", historicalLocator);
+            }
+        }
+        
+        return Optional.empty();
+    }
+    
+    private Optional<WebElement> tryAlternativeLocators(WebDriver driver, By originalLocator, String elementDescription) {
+        log.debug("Trying alternative locators for: {}", originalLocator);
+        
+        List<By> alternativeLocators = locatorHealer.generateAlternativeLocators(originalLocator, elementDescription);
+        for (By alternativeLocator : alternativeLocators) {
+            try {
+                WebElement element = driver.findElement(alternativeLocator);
+                
+                // If we found an element and learning is enabled, store it in history
+                if (enableLearning) {
+                    healingHistory.addSuccessfulHealing(originalLocator, alternativeLocator);
+                }
+                
+                log.info("Element found using alternative locator: {}", alternativeLocator);
+                return Optional.of(element);
+            } catch (NoSuchElementException e) {
+                log.debug("Alternative locator failed: {}", alternativeLocator);
+            }
+        }
+        
+        return Optional.empty();
+    }
+    
+    private Optional<WebElement> tryAIElementFinding(WebDriver driver, String elementDescription) {
+        log.debug("Trying AI element finding for description: {}", elementDescription);
+        
+        try {
+            WebElement element = aiElementFinder.findElement(driver, elementDescription);
+            log.info("Element found using AI element finder");
+            return Optional.of(element);
+        } catch (Exception e) {
+            log.debug("AI element finding failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+    
+    private Optional<WebElement> tryVisualElementFinding(WebDriver driver, String elementDescription) {
+        log.debug("Trying visual element finding for description: {}", elementDescription);
+        
+        try {
+            WebElement element = visualElementFinder.findElement(driver, elementDescription);
+            log.info("Element found using visual element finder");
+            return Optional.of(element);
+        } catch (Exception e) {
+            log.debug("Visual element finding failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+    
+    /**
+     * Simple class placeholder for LocatorHealer.
+     * This would be implemented with more sophisticated logic in reality.
+     */
+    private static class LocatorHealer {
+        public List<By> generateAlternativeLocators(By originalLocator, String description) {
+            List<By> alternatives = new ArrayList<>();
+            
+            String locatorString = originalLocator.toString();
+            
+            // Extract the value from the original locator
+            String value = locatorString.substring(locatorString.indexOf(":") + 1).trim();
+            
+            // Add alternatives based on locator type
+            if (locatorString.contains("By.id")) {
+                alternatives.add(By.name(value));
+                alternatives.add(By.className(value));
+                alternatives.add(By.cssSelector("[data-test-id='" + value + "']"));
+            } else if (locatorString.contains("By.xpath")) {
+                // Try different XPath alternatives
+                if (value.contains("@id")) {
+                    String idValue = value.replaceAll(".*@id='([^']*)'.*", "$1");
+                    alternatives.add(By.id(idValue));
+                }
+                if (value.contains("text()")) {
+                    String textValue = value.replaceAll(".*text\\(\\)='([^']*)'.*", "$1");
+                    alternatives.add(By.linkText(textValue));
+                    alternatives.add(By.partialLinkText(textValue));
+                }
+            } else if (locatorString.contains("By.cssSelector")) {
+                // Convert CSS to XPath
+                if (value.startsWith("#")) {
+                    alternatives.add(By.id(value.substring(1)));
+                } else if (value.startsWith(".")) {
+                    alternatives.add(By.className(value.substring(1)));
+                }
+            }
+            
+            // Add more alternatives based on description if available
+            if (description != null && !description.isEmpty()) {
+                alternatives.add(By.xpath("//*[contains(text(),'" + description + "')]"));
+                alternatives.add(By.xpath("//*[contains(@aria-label,'" + description + "')]"));
+                alternatives.add(By.xpath("//*[contains(@placeholder,'" + description + "')]"));
+            }
+            
+            return alternatives;
+        }
+    }
+    
+    /**
+     * Simple class placeholder for ElementDescriptionAnalyzer.
+     * This would be implemented with more sophisticated NLP in reality.
+     */
+    private static class ElementDescriptionAnalyzer {
+        // Implementation would use NLP to extract key details from descriptions
+    }
+    
+    /**
+     * Class to track and store successful healing patterns.
+     */
+    private static class HealingHistory {
+        private final Map<String, List<By>> healingMap = new ConcurrentHashMap<>();
+        
+        public void addSuccessfulHealing(By originalLocator, By successfulLocator) {
+            String key = originalLocator.toString();
+            healingMap.computeIfAbsent(key, k -> new ArrayList<>()).add(successfulLocator);
+            log.debug("Added successful healing: {} -> {}", originalLocator, successfulLocator);
+        }
+        
+        public List<By> getSuccessfulLocators(By originalLocator) {
+            return healingMap.getOrDefault(originalLocator.toString(), new ArrayList<>());
+        }
+    }
+}
+
+
+package com.cssmart.core.page;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import com.cssmart.core.driver.CSSmartDriver;
+import com.cssmart.core.element.CSSmartFindBy;
+import com.cssmart.core.element.CSSmartWebElement;
+import com.cssmart.core.healing.HealingManager;
+import com.cssmart.core.reporting.CSSmartReport;
+import com.cssmart.core.utils.WaitUtils;
+
+import java.lang.reflect.Field;
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * Base page object class for the CSSmart framework.
+ * Provides enhanced page object functionality with self-healing capabilities.
+ */
+@Slf4j
+public abstract class CSSmartBasePage {
+    
+    protected final CSSmartDriver driver;
+    protected final WebDriverWait wait;
+    protected final HealingManager healingManager;
+    protected final CSSmartReport report;
+    
+    private String pageName;
+    
+    /**
+     * Constructor for the base page object.
+     * 
+     * @param driver The CSSmartDriver instance
+     */
+    public CSSmartBasePage(CSSmartDriver driver) {
+        this.driver = driver;
+        this.wait = new WebDriverWait(driver.getWrappedDriver(), Duration.ofSeconds(30));
+        this.healingManager = HealingManager.getInstance();
+        this.report = CSSmartReport.getInstance();
+        
+        // Get page name from class for reporting
+        this.pageName = getClass().getSimpleName();
+        
+        // Initialize page elements with CSSmartFindBy
+        initializePageElements();
+        
+        // Log page initialization
+        log.info("Initialized page object: {}", pageName);
+        report.logInfo("Navigated to " + pageName);
+    }
+    
+    /**
+     * Initialize page elements with enhanced PageFactory.
+     * This method processes CSSmartFindBy annotations.
+     */
+    protected void initializePageElements() {
+        // First use standard PageFactory
+        PageFactory.initElements(driver.getWrappedDriver(), this);
+        
+        // Now process our custom annotations
+        processCSSmartFindByAnnotations();
+    }
+    
+    /**
+     * Process CSSmartFindBy annotations on fields.
+     * This allows for enhanced element finding with descriptions.
+     */
+    private void processCSSmartFindByAnnotations() {
+        Class<?> clazz = getClass();
+        
+        for (Field field : clazz.getDeclaredFields()) {
+            CSSmartFindBy annotation = field.getAnnotation(CSSmartFindBy.class);
+            
+            if (annotation != null) {
+                try {
+                    field.setAccessible(true);
+                    
+                    // If the field is already initialized by standard PageFactory, enhance it
+                    Object fieldValue = field.get(this);
+                    if (fieldValue instanceof WebElement) {
+                        WebElement element = (WebElement) fieldValue;
+                        
+                        // Create enhanced element with description from annotation
+                        CSSmartWebElement smartElement = new CSSmartWebElement(driver.getWrappedDriver(), element, annotation.description());
+                        field.set(this, smartElement);
+                    }
+                } catch (IllegalAccessException e) {
+                    log.error("Failed to process CSSmartFindBy annotation for field: {}", field.getName(), e);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Waits for the page to be fully loaded.
+     * Override in specific page classes as needed.
+     * 
+     * @return this page for method chaining
+     */
+    public CSSmartBasePage waitForPageLoad() {
+        WaitUtils.waitForPageLoad(driver.getWrappedDriver());
+        log.info("Page loaded: {}", pageName);
+        return this;
+    }
+    
+    /**
+     * Verifies if the page is currently displayed.
+     * Override in specific page classes as needed.
+     * 
+     * @return true if page is displayed, false otherwise
+     */
+    public boolean isPageDisplayed() {
+        log.info("Checking if page is displayed: {}", pageName);
+        return driver.getWrappedDriver().getTitle().contains(getExpectedTitle());
+    }
+    
+    /**
+     * Gets the expected title for the page.
+     * Override in specific page classes.
+     * 
+     * @return The expected page title
+     */
+    protected String getExpectedTitle() {
+        return "";
+    }
+    
+    /**
+     * Enhanced element finding with self-healing capabilities.
+     * 
+     * @param by The locator
+     * @param description Human-readable description of the element
+     * @return CSSmartWebElement wrapped element
+     */
+    protected CSSmartWebElement findElement(By by, String description) {
+        log.debug("Finding element: {} with description: {}", by, description);
+        
+        try {
+            // First try normal find
+            WebElement element = driver.getWrappedDriver().findElement(by);
+            return new CSSmartWebElement(driver.getWrappedDriver(), element, description);
+        } catch (Exception e) {
+            // If normal find fails, try self-healing
+            log.debug("Normal find failed, attempting self-healing", e);
+            
+            Optional<WebElement> healedElement = healingManager.healElement(driver.getWrappedDriver(), by, description);
+            
+            if (healedElement.isPresent()) {
+                return new CSSmartWebElement(driver.getWrappedDriver(), healedElement.get(), description);
+            }
+            
+            // Re-throw if healing failed
+            throw e;
+        }
+    }
+    
+    /**
+     * Enhanced elements finding with self-healing capabilities.
+     * 
+     * @param by The locator
+     * @param description Human-readable description of the elements
+     * @return List of CSSmartWebElement wrapped elements
+     */
+    protected List<CSSmartWebElement> findElements(By by, String description) {
+        log.debug("Finding elements: {} with description: {}", by, description);
+        
+        // Currently not implementing healing for lists of elements
+        // This would be a more complex implementation
+        List<WebElement> elements = driver.getWrappedDriver().findElements(by);
+        
+        // Convert each element to a CSSmartWebElement
+        return elements.stream()
+                .map(element -> new CSSmartWebElement(driver.getWrappedDriver(), element, description))
+                .toList();
+    }
+    
+    /**
+     * Waits for an element to be visible with self-healing capabilities.
+     * 
+     * @param by The locator
+     * @param description Human-readable description of the element
+     * @return CSSmartWebElement wrapped element
+     */
+    protected CSSmartWebElement waitForElementVisible(By by, String description) {
+        log.debug("Waiting for element to be visible: {} with description: {}", by, description);
+        
+        try {
+            WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(by));
+            return new CSSmartWebElement(driver.getWrappedDriver(), element, description);
+        } catch (Exception e) {
+            // If waiting fails, try self-healing
+            log.debug("Wait failed, attempting self-healing", e);
+            
+            Optional<WebElement> healedElement = healingManager.healElement(driver.getWrappedDriver(), by, description);
+            
+            if (healedElement.isPresent()) {
+                // Wait for the healed element to be visible
+                WebElement element = wait.until(ExpectedConditions.visibilityOf(healedElement.get()));
+                return new CSSmartWebElement(driver.getWrappedDriver(), element, description);
+            }
+            
+            // Re-throw if healing failed
+            throw e;
+        }
+    }
+    
+    /**
+     * Waits for an element to be clickable with self-healing capabilities.
+     * 
+     * @param by The locator
+     * @param description Human-readable description of the element
+     * @return CSSmartWebElement wrapped element
+     */
+    protected CSSmartWebElement waitForElementClickable(By by, String description) {
+        log.debug("Waiting for element to be clickable: {} with description: {}", by, description);
+        
+        try {
+            WebElement element = wait.until(ExpectedConditions.elementToBeClickable(by));
+            return new CSSmartWebElement(driver.getWrappedDriver(), element, description);
+        } catch (Exception e) {
+            // If waiting fails, try self-healing
+            log.debug("Wait failed, attempting self-healing", e);
+            
+            Optional<WebElement> healedElement = healingManager.healElement(driver.getWrappedDriver(), by, description);
+            
+            if (healedElement.isPresent()) {
+                // Wait for the healed element to be clickable
+                WebElement element = wait.until(ExpectedConditions.elementToBeClickable(healedElement.get()));
+                return new CSSmartWebElement(driver.getWrappedDriver(), element, description);
+            }
+            
+            // Re-throw if healing failed
+            throw e;
+        }
+    }
+}
+
+
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.11.0</version>
+    <configuration>
+        <source>17</source>
+        <target>17</target>
+        <annotationProcessorPaths>
+            <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+                <version>1.1.1</version>
+            </path>
+        </annotationProcessorPaths>
+    </configuration>
+</plugin>
+
+<dependency>
+    <groupId>com.google.auto.service</groupId>
+    <artifactId>auto-service</artifactId>
+    <version>1.1.1</version>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <version>1.18.32</version>
+    <scope>provided</scope>
+</dependency>
+
