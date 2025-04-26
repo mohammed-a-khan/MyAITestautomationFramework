@@ -1,0 +1,1010 @@
+package com.cssmart.framework.healing.impl;
+
+import com.cssmart.framework.healing.HealingContext;
+import com.cssmart.framework.healing.HealingResult;
+import com.cssmart.framework.healing.HealingStrategy;
+import com.cssmart.framework.logging.CSSmartLogger;
+import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * Semantic healing strategy uses natural language processing principles
+ * to locate elements based on their textual description and semantic meaning.
+ */
+public class SemanticHealingStrategy implements HealingStrategy {
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(SemanticHealingStrategy.class);
+    
+    // Description used for semantic matching
+    private final String elementDescription;
+    
+    // Cache of common terms and synonyms
+    private static final Map<String, List<String>> synonymDictionary = initializeSynonymDictionary();
+    
+    // Common button text patterns
+    private static final List<Pattern> buttonPatterns = initializeButtonPatterns();
+    
+    // Common form field patterns
+    private static final List<Pattern> formFieldPatterns = initializeFormFieldPatterns();
+    
+    public SemanticHealingStrategy(String elementDescription) {
+        this.elementDescription = elementDescription != null ? elementDescription : "";
+    }
+    
+    @Override
+    public HealingResult heal(HealingContext context) {
+        if (elementDescription.isEmpty()) {
+            return new HealingResult(false, "SEMANTIC", "No element description available for semantic healing", null);
+        }
+        
+        logger.info("Attempting semantic healing for: " + elementDescription);
+        
+        WebDriver driver = context.getDriver();
+        if (driver == null) {
+            return new HealingResult(false, "SEMANTIC", "WebDriver is null", null);
+        }
+        
+        // Parse the description to extract key information
+        Map<String, String> semanticInfo = parseDescription(elementDescription);
+        String elementType = semanticInfo.getOrDefault("elementType", "");
+        String elementPurpose = semanticInfo.getOrDefault("elementPurpose", "");
+        String elementLocation = semanticInfo.getOrDefault("elementLocation", "");
+        
+        // Choose search strategy based on extracted information
+        if (!elementType.isEmpty()) {
+            // Try to find by element type and other extracted information
+            WebElement element = findByTypeAndPurpose(driver, elementType, elementPurpose, elementLocation);
+            
+            if (element != null) {
+                return new HealingResult(true, "SEMANTIC", 
+                    "Element found by semantic type '" + elementType + "' and purpose '" + elementPurpose + "'", element);
+            }
+        }
+        
+        // If no specific type extracted or type-based search failed, try keyword-based search
+        List<String> keywords = extractKeywords(elementDescription);
+        WebElement element = findByKeywords(driver, keywords);
+        
+        if (element != null) {
+            return new HealingResult(true, "SEMANTIC", 
+                "Element found by semantic keywords: " + String.join(", ", keywords), element);
+        }
+        
+        // Try finding by expanded synonyms if direct keywords failed
+        List<String> expandedKeywords = expandWithSynonyms(keywords);
+        element = findByKeywords(driver, expandedKeywords);
+        
+        if (element != null) {
+            return new HealingResult(true, "SEMANTIC", 
+                "Element found by expanded semantic keywords with synonyms", element);
+        }
+        
+        // All semantic approaches failed
+        return new HealingResult(false, "SEMANTIC", 
+            "Semantic healing failed to locate element matching '" + elementDescription + "'", null);
+    }
+    
+    /**
+     * Parses a natural language description to extract semantic information
+     */
+    private Map<String, String> parseDescription(String description) {
+        Map<String, String> result = new HashMap<>();
+        description = description.toLowerCase();
+        
+        // Extract element type
+        if (description.contains("button") || description.contains("btn")) {
+            result.put("elementType", "button");
+        } else if (description.contains("input") || description.contains("field") || 
+                  description.contains("textbox") || description.contains("text box")) {
+            result.put("elementType", "input");
+        } else if (description.contains("checkbox") || description.contains("check box")) {
+            result.put("elementType", "checkbox");
+        } else if (description.contains("radio") || description.contains("option")) {
+            result.put("elementType", "radio");
+        } else if (description.contains("dropdown") || description.contains("drop down") || 
+                  description.contains("select") || description.contains("combobox")) {
+            result.put("elementType", "select");
+        } else if (description.contains("link")) {
+            result.put("elementType", "link");
+        } else if (description.contains("image") || description.contains("img") || 
+                  description.contains("icon")) {
+            result.put("elementType", "image");
+        } else if (description.contains("header") || description.contains("heading") || 
+                  description.matches(".*(h1|h2|h3|h4|h5|h6).*")) {
+            result.put("elementType", "heading");
+        }
+        
+        // Extract element purpose (e.g., "login", "submit", "search")
+        List<String> commonPurposes = Arrays.asList(
+            "login", "logout", "sign in", "signup", "sign up", "register", 
+            "submit", "save", "cancel", "delete", "remove", "add", "create", 
+            "edit", "update", "search", "find", "filter", "sort", "download", 
+            "upload", "send", "share", "like", "follow", "comment", "accept", 
+            "confirm", "ok", "agree", "disagree", "next", "previous", "back"
+        );
+        
+        for (String purpose : commonPurposes) {
+            if (description.contains(purpose)) {
+                result.put("elementPurpose", purpose);
+                break;
+            }
+        }
+        
+        // Extract position/location references
+        if (description.contains("top") || description.contains("upper") || 
+            description.contains("above") || description.contains("header")) {
+            result.put("elementLocation", "top");
+        } else if (description.contains("bottom") || description.contains("lower") || 
+                  description.contains("below") || description.contains("footer")) {
+            result.put("elementLocation", "bottom");
+        } else if (description.contains("left") || description.contains("beginning") || 
+                  description.contains("start")) {
+            result.put("elementLocation", "left");
+        } else if (description.contains("right") || description.contains("end")) {
+            result.put("elementLocation", "right");
+        } else if (description.contains("middle") || description.contains("center")) {
+            result.put("elementLocation", "center");
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Extracts relevant keywords from the description
+     */
+    private List<String> extractKeywords(String description) {
+        // Convert to lowercase and tokenize
+        String normalized = description.toLowerCase();
+        String[] words = normalized.split("\\s+");
+        
+        // Remove stop words and keep important keywords
+        Set<String> stopWords = new HashSet<>(Arrays.asList(
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", 
+            "with", "by", "about", "of", "from", "as", "this", "that", "these", 
+            "those", "is", "are", "was", "were", "be", "been", "being"
+        ));
+        
+        List<String> keywords = new ArrayList<>();
+        for (String word : words) {
+            // Clean word of punctuation
+            word = word.replaceAll("[^a-zA-Z0-9]", "");
+            if (!word.isEmpty() && !stopWords.contains(word) && word.length() > 2) {
+                keywords.add(word);
+            }
+        }
+        
+        return keywords;
+    }
+    
+    /**
+     * Expand keywords with synonyms
+     */
+    private List<String> expandWithSynonyms(List<String> keywords) {
+        Set<String> expanded = new HashSet<>(keywords);
+        
+        for (String keyword : keywords) {
+            List<String> synonyms = synonymDictionary.getOrDefault(keyword, Collections.emptyList());
+            expanded.addAll(synonyms);
+        }
+        
+        return new ArrayList<>(expanded);
+    }
+    
+    /**
+     * Finds an element by its type and purpose
+     */
+    private WebElement findByTypeAndPurpose(WebDriver driver, String elementType, String elementPurpose, 
+                                          String elementLocation) {
+        try {
+            switch (elementType) {
+                case "button":
+                    return findButton(driver, elementPurpose, elementLocation);
+                    
+                case "input":
+                    return findInput(driver, elementPurpose, elementLocation);
+                    
+                case "checkbox":
+                    return findCheckbox(driver, elementPurpose, elementLocation);
+                    
+                case "radio":
+                    return findRadio(driver, elementPurpose, elementLocation);
+                    
+                case "select":
+                    return findSelect(driver, elementPurpose, elementLocation);
+                    
+                case "link":
+                    return findLink(driver, elementPurpose, elementLocation);
+                    
+                case "image":
+                    return findImage(driver, elementPurpose, elementLocation);
+                    
+                case "heading":
+                    return findHeading(driver, elementPurpose, elementLocation);
+                    
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            logger.error("Error in findByTypeAndPurpose", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a button element based on purpose and location
+     */
+    private WebElement findButton(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for button elements
+            candidates.addAll(driver.findElements(By.tagName("button")));
+            
+            // Look for input elements of type button or submit
+            candidates.addAll(driver.findElements(By.cssSelector("input[type='button'], input[type='submit']")));
+            
+            // Look for anchor tags that look like buttons
+            candidates.addAll(driver.findElements(By.cssSelector("a.btn, a.button")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                // Create expanded purpose keywords
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                // Filter by text content, value, or other attributes
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        String text = e.getText().toLowerCase();
+                        String value = e.getAttribute("value");
+                        value = (value != null) ? value.toLowerCase() : "";
+                        String ariaLabel = e.getAttribute("aria-label");
+                        ariaLabel = (ariaLabel != null) ? ariaLabel.toLowerCase() : "";
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            text.contains(keyword) || value.contains(keyword) || 
+                            ariaLabel.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding button", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds an input field based on purpose and location
+     */
+    private WebElement findInput(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for input elements of type text, email, password, etc.
+            candidates.addAll(driver.findElements(By.cssSelector(
+                "input[type='text'], input[type='email'], input[type='password'], " +
+                "input[type='search'], input[type='tel'], input[type='url'], " +
+                "input[type='number'], input:not([type]), textarea")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                // Create expanded purpose keywords
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        // Check various attributes that might indicate purpose
+                        String name = e.getAttribute("name");
+                        name = (name != null) ? name.toLowerCase() : "";
+                        
+                        String id = e.getAttribute("id");
+                        id = (id != null) ? id.toLowerCase() : "";
+                        
+                        String placeholder = e.getAttribute("placeholder");
+                        placeholder = (placeholder != null) ? placeholder.toLowerCase() : "";
+                        
+                        String ariaLabel = e.getAttribute("aria-label");
+                        ariaLabel = (ariaLabel != null) ? ariaLabel.toLowerCase() : "";
+                        
+                        // Check nearby label text
+                        String labelText = findAssociatedLabelText(driver, e);
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            name.contains(keyword) || id.contains(keyword) || 
+                            placeholder.contains(keyword) || ariaLabel.contains(keyword) ||
+                            labelText.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding input", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a checkbox based on purpose and location
+     */
+    private WebElement findCheckbox(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for checkbox inputs
+            candidates.addAll(driver.findElements(By.cssSelector("input[type='checkbox']")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        // Look for associated label text
+                        String labelText = findAssociatedLabelText(driver, e);
+                        
+                        // Check attributes
+                        String name = e.getAttribute("name");
+                        name = (name != null) ? name.toLowerCase() : "";
+                        
+                        String id = e.getAttribute("id");
+                        id = (id != null) ? id.toLowerCase() : "";
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            labelText.contains(keyword) || name.contains(keyword) || id.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding checkbox", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a radio button based on purpose and location
+     */
+    private WebElement findRadio(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for radio inputs
+            candidates.addAll(driver.findElements(By.cssSelector("input[type='radio']")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        // Look for associated label text
+                        String labelText = findAssociatedLabelText(driver, e);
+                        
+                        // Check attributes
+                        String name = e.getAttribute("name");
+                        name = (name != null) ? name.toLowerCase() : "";
+                        
+                        String id = e.getAttribute("id");
+                        id = (id != null) ? id.toLowerCase() : "";
+                        
+                        String value = e.getAttribute("value");
+                        value = (value != null) ? value.toLowerCase() : "";
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            labelText.contains(keyword) || name.contains(keyword) || 
+                            id.contains(keyword) || value.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding radio button", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a select/dropdown element based on purpose and location
+     */
+    private WebElement findSelect(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for select elements
+            candidates.addAll(driver.findElements(By.tagName("select")));
+            
+            // Also look for div elements that might be custom dropdowns
+            candidates.addAll(driver.findElements(By.cssSelector(
+                "div[role='listbox'], div[class*='dropdown'], div[class*='select'], " + 
+                "div[class*='combobox'], div[aria-haspopup='listbox']")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        // Look for associated label text
+                        String labelText = findAssociatedLabelText(driver, e);
+                        
+                        // Check attributes
+                        String name = e.getAttribute("name");
+                        name = (name != null) ? name.toLowerCase() : "";
+                        
+                        String id = e.getAttribute("id");
+                        id = (id != null) ? id.toLowerCase() : "";
+                        
+                        String ariaLabel = e.getAttribute("aria-label");
+                        ariaLabel = (ariaLabel != null) ? ariaLabel.toLowerCase() : "";
+                        
+                        // For select elements, check option values
+                        boolean hasMatchingOption = false;
+                        if ("select".equals(e.getTagName().toLowerCase())) {
+                            List<WebElement> options = e.findElements(By.tagName("option"));
+                            for (WebElement option : options) {
+                                String optionText = option.getText().toLowerCase();
+                                if (purposeKeywords.stream().anyMatch(optionText::contains)) {
+                                    hasMatchingOption = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            labelText.contains(keyword) || name.contains(keyword) || 
+                            id.contains(keyword) || ariaLabel.contains(keyword)) || 
+                            hasMatchingOption;
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding select/dropdown", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a link element based on purpose and location
+     */
+    private WebElement findLink(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for anchor tags
+            candidates.addAll(driver.findElements(By.tagName("a")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        String text = e.getText().toLowerCase();
+                        String href = e.getAttribute("href");
+                        href = (href != null) ? href.toLowerCase() : "";
+                        
+                        String title = e.getAttribute("title");
+                        title = (title != null) ? title.toLowerCase() : "";
+                        
+                        String ariaLabel = e.getAttribute("aria-label");
+                        ariaLabel = (ariaLabel != null) ? ariaLabel.toLowerCase() : "";
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            text.contains(keyword) || title.contains(keyword) || 
+                            ariaLabel.contains(keyword) || href.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding link", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds an image element based on purpose and location
+     */
+    private WebElement findImage(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for image elements
+            candidates.addAll(driver.findElements(By.tagName("img")));
+            
+            // Also look for SVG elements
+            candidates.addAll(driver.findElements(By.tagName("svg")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        String alt = e.getAttribute("alt");
+                        alt = (alt != null) ? alt.toLowerCase() : "";
+                        
+                        String title = e.getAttribute("title");
+                        title = (title != null) ? title.toLowerCase() : "";
+                        
+                        String src = e.getAttribute("src");
+                        src = (src != null) ? src.toLowerCase() : "";
+                        
+                        String ariaLabel = e.getAttribute("aria-label");
+                        ariaLabel = (ariaLabel != null) ? ariaLabel.toLowerCase() : "";
+                        
+                        return purposeKeywords.stream().anyMatch(keyword -> 
+                            alt.contains(keyword) || title.contains(keyword) || 
+                            src.contains(keyword) || ariaLabel.contains(keyword));
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding image", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds a heading element based on purpose and location
+     */
+    private WebElement findHeading(WebDriver driver, String purpose, String location) {
+        List<WebElement> candidates = new ArrayList<>();
+        
+        try {
+            // Look for heading elements h1 through h6
+            candidates.addAll(driver.findElements(By.cssSelector("h1, h2, h3, h4, h5, h6")));
+            
+            // Also look for elements with heading roles
+            candidates.addAll(driver.findElements(By.cssSelector("[role='heading']")));
+            
+            // Filter candidates by purpose if specified
+            if (!purpose.isEmpty()) {
+                List<String> purposeKeywords = new ArrayList<>();
+                purposeKeywords.add(purpose);
+                purposeKeywords.addAll(expandWithSynonyms(Collections.singletonList(purpose)));
+                
+                candidates = candidates.stream()
+                    .filter(e -> {
+                        String text = e.getText().toLowerCase();
+                        
+                        return purposeKeywords.stream().anyMatch(text::contains);
+                    })
+                    .collect(Collectors.toList());
+            }
+            
+            // If we have multiple candidates, try to filter by location
+            if (candidates.size() > 1 && !location.isEmpty()) {
+                candidates = filterByLocation(candidates, location);
+            }
+            
+            // Return the first (or only) match
+            return candidates.isEmpty() ? null : candidates.get(0);
+            
+        } catch (Exception e) {
+            logger.error("Error finding heading", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Finds the text of a label associated with an element
+     */
+    private String findAssociatedLabelText(WebDriver driver, WebElement element) {
+        try {
+            // Check for the id attribute
+            String id = element.getAttribute("id");
+            if (id != null && !id.isEmpty()) {
+                // Look for a label with a matching 'for' attribute
+                try {
+                    WebElement label = driver.findElement(By.cssSelector("label[for='" + id + "']"));
+                    if (label != null) {
+                        return label.getText().toLowerCase();
+                    }
+                } catch (Exception e) {
+                    // No label found, continue with other methods
+                }
+            }
+            
+            // Look for a parent label element
+            try {
+                WebElement parent = element.findElement(By.xpath("./ancestor::label"));
+                if (parent != null) {
+                    String labelText = parent.getText().toLowerCase();
+                    // Remove the text of the element itself if it's a text input
+                    String elementValue = element.getAttribute("value");
+                    if (elementValue != null && !elementValue.isEmpty()) {
+                        labelText = labelText.replace(elementValue.toLowerCase(), "").trim();
+                    }
+                    return labelText;
+                }
+            } catch (Exception e) {
+                // No parent label found, continue with other methods
+            }
+            
+            // Look for a label element immediately preceding the element
+            try {
+                WebElement previousLabel = element.findElement(By.xpath("./preceding::label[1]"));
+                if (previousLabel != null && isNearby(element, previousLabel)) {
+                    return previousLabel.getText().toLowerCase();
+                }
+            } catch (Exception e) {
+                // No preceding label found or not nearby
+            }
+            
+            // Look for any text node nearby that might serve as a label
+            try {
+                List<WebElement> nearbyTexts = driver.findElements(By.xpath(
+                    "//*[not(self::script or self::style)][text()[normalize-space()]]"));
+                
+                for (WebElement textElement : nearbyTexts) {
+                    if (isNearby(element, textElement)) {
+                        return textElement.getText().toLowerCase();
+                    }
+                }
+            } catch (Exception e) {
+                // Error finding nearby text
+            }
+            
+            // If no label found, return empty string
+            return "";
+        } catch (Exception e) {
+            logger.error("Error finding associated label", e);
+            return "";
+        }
+    }
+    
+    /**
+     * Checks if two elements are physically near each other on the page
+     */
+    private boolean isNearby(WebElement element1, WebElement element2) {
+        try {
+            // Get the locations of both elements
+            org.openqa.selenium.Rectangle rect1 = element1.getRect();
+            org.openqa.selenium.Rectangle rect2 = element2.getRect();
+            
+            // Define a proximity threshold (in pixels)
+            int threshold = 150;
+            
+            // Calculate distances
+            int horizontalDistance = Math.min(
+                Math.abs(rect1.x - (rect2.x + rect2.width)),
+                Math.abs(rect2.x - (rect1.x + rect1.width))
+            );
+            
+            int verticalDistance = Math.min(
+                Math.abs(rect1.y - (rect2.y + rect2.height)),
+                Math.abs(rect2.y - (rect1.y + rect1.height))
+            );
+            
+            // If distance is negative, the elements overlap
+            horizontalDistance = Math.max(0, horizontalDistance);
+            verticalDistance = Math.max(0, verticalDistance);
+            
+            // Elements are nearby if they're close either horizontally or vertically
+            return horizontalDistance < threshold || verticalDistance < threshold;
+            
+        } catch (Exception e) {
+            // If we can't determine positions, assume they're not nearby
+            return false;
+        }
+    }
+    
+    /**
+     * Filters a list of elements by their location on the page
+     */
+    private List<WebElement> filterByLocation(List<WebElement> elements, String location) {
+        if (elements.isEmpty() || location.isEmpty()) {
+            return elements;
+        }
+        
+        List<WebElement> filtered = new ArrayList<>();
+        
+        try {
+            // Get the dimensions of the viewport
+            WebElement html = elements.get(0).findElement(By.tagName("html"));
+            Dimension viewportSize = html.getSize();
+            int viewportWidth = viewportSize.getWidth();
+            int viewportHeight = viewportSize.getHeight();
+            
+            // Define regions of the page
+            int topThreshold = viewportHeight / 3;
+            int bottomThreshold = viewportHeight * 2 / 3;
+            int leftThreshold = viewportWidth / 3;
+            int rightThreshold = viewportWidth * 2 / 3;
+            
+            for (WebElement element : elements) {
+                org.openqa.selenium.Rectangle rect = element.getRect();
+                
+                // Calculate the center point of the element
+                int centerX = rect.x + rect.width / 2;
+                int centerY = rect.y + rect.height / 2;
+                
+                boolean matches = false;
+                
+                switch (location.toLowerCase()) {
+                    case "top":
+                        matches = centerY < topThreshold;
+                        break;
+                    case "bottom":
+                        matches = centerY > bottomThreshold;
+                        break;
+                    case "left":
+                        matches = centerX < leftThreshold;
+                        break;
+                    case "right":
+                        matches = centerX > rightThreshold;
+                        break;
+                    case "center":
+                        matches = centerY >= topThreshold && centerY <= bottomThreshold &&
+                                  centerX >= leftThreshold && centerX <= rightThreshold;
+                        break;
+                }
+                
+                if (matches) {
+                    filtered.add(element);
+                }
+            }
+            
+            if (!filtered.isEmpty()) {
+                return filtered;
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error filtering elements by location", e);
+        }
+        
+        // If filtering failed or no elements matched, return the original list
+        return elements;
+    }
+    
+    /**
+     * Finds an element by keyword matching against all elements on the page
+     */
+    private WebElement findByKeywords(WebDriver driver, List<String> keywords) {
+        if (keywords.isEmpty()) {
+            return null;
+        }
+        
+        Map<WebElement, Integer> scores = new HashMap<>();
+        
+        try {
+            // Find all visible elements that might be interactive
+            List<WebElement> allElements = driver.findElements(By.cssSelector(
+                "button, input, select, textarea, a, [role='button'], [role='link'], " +
+                "[role='checkbox'], [role='radio'], [role='menuitem'], [role='tab'], " +
+                "[tabindex], [class*='btn'], [class*='button']"));
+            
+            for (WebElement element : allElements) {
+                int score = calculateKeywordMatchScore(element, keywords);
+                if (score > 0) {
+                    scores.put(element, score);
+                }
+            }
+            
+            // Find the element with the highest score
+            WebElement bestMatch = null;
+            int highestScore = 0;
+            
+            for (Map.Entry<WebElement, Integer> entry : scores.entrySet()) {
+                if (entry.getValue() > highestScore) {
+                    highestScore = entry.getValue();
+                    bestMatch = entry.getKey();
+                }
+            }
+            
+            // Only return if the score is above a minimum threshold
+            if (highestScore >= 2) {
+                return bestMatch;
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error in findByKeywords", e);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Calculates a match score between an element and a list of keywords
+     */
+    private int calculateKeywordMatchScore(WebElement element, List<String> keywords) {
+        int score = 0;
+        
+        try {
+            // Check text content
+            String text = element.getText().toLowerCase();
+            for (String keyword : keywords) {
+                if (text.contains(keyword.toLowerCase())) {
+                    score += 3; // Text content is highly relevant
+                }
+            }
+            
+            // Check various attributes
+            String[] attributes = {"id", "name", "class", "placeholder", "value", 
+                                  "title", "aria-label", "alt", "data-testid"};
+            
+            for (String attribute : attributes) {
+                String value = element.getAttribute(attribute);
+                if (value != null && !value.isEmpty()) {
+                    value = value.toLowerCase();
+                    for (String keyword : keywords) {
+                        if (value.contains(keyword.toLowerCase())) {
+                            score += 2; // Attribute matches are relevant
+                        }
+                    }
+                }
+            }
+            
+            // Check for associated label text
+            String labelText = findAssociatedLabelText(element.findElement(By.xpath("ancestor::body[1]")).getWrappedDriver(), element);
+            for (String keyword : keywords) {
+                if (labelText.contains(keyword.toLowerCase())) {
+                    score += 3; // Label matches are highly relevant
+                }
+            }
+            
+        } catch (Exception e) {
+            // Ignore errors and return current score
+        }
+        
+        return score;
+    }
+    
+    /**
+     * Initialize a dictionary of common synonyms for UI terms
+     */
+    private static Map<String, List<String>> initializeSynonymDictionary() {
+        Map<String, List<String>> synonyms = new HashMap<>();
+        
+        // Button-related terms
+        synonyms.put("button", Arrays.asList("btn", "submit", "cancel", "ok", "confirm"));
+        synonyms.put("submit", Arrays.asList("save", "confirm", "ok", "apply", "send"));
+        synonyms.put("cancel", Arrays.asList("close", "exit", "back", "return"));
+        
+        // Login-related terms
+        synonyms.put("login", Arrays.asList("signin", "sign-in", "log-in", "authenticate"));
+        synonyms.put("logout", Arrays.asList("signout", "sign-out", "log-out", "exit"));
+        synonyms.put("register", Arrays.asList("signup", "sign-up", "create account", "join"));
+        
+        // Navigation terms
+        synonyms.put("next", Arrays.asList("continue", "forward", "proceed"));
+        synonyms.put("previous", Arrays.asList("back", "prev", "return"));
+        
+        // Form field terms
+        synonyms.put("email", Arrays.asList("e-mail", "mail", "email address"));
+        synonyms.put("password", Arrays.asList("pwd", "pass", "passphrase"));
+        synonyms.put("username", Arrays.asList("user", "login", "userid", "user id"));
+        synonyms.put("firstname", Arrays.asList("first name", "given name", "forename"));
+        synonyms.put("lastname", Arrays.asList("last name", "surname", "family name"));
+        
+        // Common action terms
+        synonyms.put("search", Arrays.asList("find", "lookup", "query"));
+        synonyms.put("add", Arrays.asList("create", "new", "insert", "plus"));
+        synonyms.put("remove", Arrays.asList("delete", "erase", "trash", "minus"));
+        synonyms.put("edit", Arrays.asList("modify", "change", "update"));
+        
+        return synonyms;
+    }
+    
+    /**
+     * Initialize common button text patterns
+     */
+    private static List<Pattern> initializeButtonPatterns() {
+        List<Pattern> patterns = new ArrayList<>();
+        
+        // Common button text patterns
+        patterns.add(Pattern.compile("(?i)log[ -]?in|sign[ -]?in|authenticate"));
+        patterns.add(Pattern.compile("(?i)log[ -]?out|sign[ -]?out"));
+        patterns.add(Pattern.compile("(?i)register|sign[ -]?up|create account"));
+        patterns.add(Pattern.compile("(?i)submit|save|confirm|ok|apply|send"));
+        patterns.add(Pattern.compile("(?i)cancel|close|exit|back|return"));
+        patterns.add(Pattern.compile("(?i)search|find|lookup|query"));
+        patterns.add(Pattern.compile("(?i)add|create|new|insert"));
+        patterns.add(Pattern.compile("(?i)remove|delete|erase|trash"));
+        patterns.add(Pattern.compile("(?i)edit|modify|change|update"));
+        patterns.add(Pattern.compile("(?i)next|continue|forward|proceed"));
+        patterns.add(Pattern.compile("(?i)previous|prev|back|return"));
+        
+        return patterns;
+    }
+    
+    /**
+     * Initialize common form field patterns
+     */
+    private static List<Pattern> initializeFormFieldPatterns() {
+        List<Pattern> patterns = new ArrayList<>();
+        
+        // Common form field patterns
+        patterns.add(Pattern.compile("(?i)email|e-mail|mail"));
+        patterns.add(Pattern.compile("(?i)password|pwd|pass"));
+        patterns.add(Pattern.compile("(?i)username|user|userid|login"));
+        patterns.add(Pattern.compile("(?i)first[ -]?name|given[ -]?name|forename"));
+        patterns.add(Pattern.compile("(?i)last[ -]?name|surname|family[ -]?name"));
+        patterns.add(Pattern.compile("(?i)address|street|location"));
+        patterns.add(Pattern.compile("(?i)city|town"));
+        patterns.add(Pattern.compile("(?i)state|province|region"));
+        patterns.add(Pattern.compile("(?i)zip|zipcode|postal[ -]?code"));
+        patterns.add(Pattern.compile("(?i)country|nation"));
+        patterns.add(Pattern.compile("(?i)phone|telephone|mobile"));
+        
+        return patterns;
+    }
+}
