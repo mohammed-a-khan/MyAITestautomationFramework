@@ -1008,3 +1008,98 @@ public class SemanticHealingStrategy implements HealingStrategy {
         return patterns;
     }
 }
+
+
+
+public class TestPlanDetails {
+    private final String id;
+    private final String name;
+    private final String description;
+    private final String state;
+    
+    public TestPlanDetails(String id, String name, String description, String state) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.state = state;
+    }
+    
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public String getState() { return state; }
+}
+
+public class TestSuite {
+    private final String id;
+    private final String name;
+    private final String parentId;
+    
+    public TestSuite(String id, String name, String parentId) {
+        this.id = id;
+        this.name = name;
+        this.parentId = parentId;
+    }
+    
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getParentId() { return parentId; }
+}
+
+public class TestCase {
+    private final String id;
+    private final String name;
+    private final int priority;/**
+ * Create a GET HTTP request with proper headers
+ */
+private HttpRequest createGetRequest(String url) {
+    return HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header("Accept", "application/json")
+        .header("Authorization", getAuthHeader())
+        .GET()
+        .build();
+}
+
+/**
+ * Create a POST HTTP request with proper headers and body
+ */
+private HttpRequest createPostRequest(String url, String body) {
+    return HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", getAuthHeader())
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+}
+
+/**
+ * Get the Authorization header value for ADO API
+ */
+private String getAuthHeader() {
+    String pat = config.getProperty("ado.pat");
+    if (pat == null) {
+        throw new CSSmartException("ADO Personal Access Token not configured in application.properties");
+    }
+    
+    String auth = ":" + pat;
+    return "Basic " + Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+}
+
+
+
+    
+    public TestCase(String id, String name, int priority) {
+        this.id = id;
+        this.name = name;
+        this.priority = priority;
+    }
+    
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public int getPriority() { return priority; }
+}
+
+
+
