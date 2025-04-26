@@ -1103,3 +1103,464 @@ private String getAuthHeader() {
 
 
 
+package com.cssmart.framework.driver;
+
+import com.cssmart.framework.exceptions.CSSmartElementException;
+import com.cssmart.framework.logging.CSSmartLogger;
+import com.cssmart.framework.reporting.CSSmartReport;
+import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.Point;
+import org.openqa.selenium.Rectangle;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Enhanced WebElement with detailed reporting
+ */
+public class CSSmartWebElement implements WebElement, TakesScreenshot {
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(CSSmartWebElement.class);
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    
+    private final CSSmartDriver driver;
+    private WebElement element;
+    private final By locator;
+    private final String elementName;
+    
+    /**
+     * Constructor with CSSmartDriver and locator
+     * @param driver the CSSmartDriver
+     * @param locator the locator
+     * @param elementName the element name for reporting
+     */
+    public CSSmartWebElement(CSSmartDriver driver, By locator, String elementName) {
+        this.driver = driver;
+        this.locator = locator;
+        this.elementName = elementName;
+        
+        // Find the element
+        try {
+            this.element = driver.getWrappedDriver().findElement(locator);
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to find element: " + elementName, e);
+        }
+    }
+    
+    /**
+     * Constructor with CSSmartDriver and WebElement
+     * @param driver the CSSmartDriver
+     * @param element the WebElement
+     * @param locator the locator
+     * @param elementName the element name for reporting
+     */
+    public CSSmartWebElement(CSSmartDriver driver, WebElement element, By locator, String elementName) {
+        this.driver = driver;
+        this.element = element;
+        this.locator = locator;
+        this.elementName = elementName;
+    }
+    
+    /**
+     * Get the wrapped WebElement
+     * @return the WebElement
+     */
+    public WebElement getWrappedElement() {
+        return element;
+    }
+    
+    /**
+     * Get the element locator
+     * @return the locator
+     */
+    public By getLocator() {
+        return locator;
+    }
+    
+    /**
+     * Get the original locator (alias for getLocator)
+     * @return the locator
+     */
+    public By getOriginalLocator() {
+        return locator;
+    }
+    
+    /**
+     * Get the element name
+     * @return the element name
+     */
+    public String getElementName() {
+        return elementName;
+    }
+    
+    /**
+     * Attempt to heal a stale element
+     */
+    private void healElement() {
+        try {
+            logger.info("Attempting to heal stale element: " + elementName);
+            this.element = driver.getWrappedDriver().findElement(locator);
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to heal stale element: " + elementName, e);
+        }
+    }
+    
+    // Enhanced WebElement methods
+    
+    @Override
+    public void click() {
+        try {
+            logger.debug("Clicking on element: " + elementName);
+            report.logInfo("Clicking on element: " + elementName);
+            element.click();
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                healElement();
+                logger.debug("Retrying click after healing element: " + elementName);
+                element.click();
+            } catch (Exception ex) {
+                report.logError("Failed to click on element: " + elementName);
+                throw new CSSmartElementException("Failed to click on element: " + elementName, e);
+            }
+        }
+    }
+    
+    @Override
+    public void submit() {
+        try {
+            logger.debug("Submitting form with element: " + elementName);
+            report.logInfo("Submitting form with element: " + elementName);
+            element.submit();
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                healElement();
+                logger.debug("Retrying submit after healing element: " + elementName);
+                element.submit();
+            } catch (Exception ex) {
+                report.logError("Failed to submit form with element: " + elementName);
+                throw new CSSmartElementException("Failed to submit form with element: " + elementName, e);
+            }
+        }
+    }
+    
+    @Override
+    public void sendKeys(CharSequence... keysToSend) {
+        try {
+            String text = String.join("", keysToSend);
+            logger.debug("Sending keys to element: " + elementName + " - " + text);
+            report.logInfo("Sending keys to element: " + elementName + " - " + text);
+            element.sendKeys(keysToSend);
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                healElement();
+                logger.debug("Retrying sendKeys after healing element: " + elementName);
+                element.sendKeys(keysToSend);
+            } catch (Exception ex) {
+                report.logError("Failed to send keys to element: " + elementName);
+                throw new CSSmartElementException("Failed to send keys to element: " + elementName, e);
+            }
+        }
+    }
+    
+    @Override
+    public void clear() {
+        try {
+            logger.debug("Clearing element: " + elementName);
+            report.logInfo("Clearing element: " + elementName);
+            element.clear();
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                healElement();
+                logger.debug("Retrying clear after healing element: " + elementName);
+                element.clear();
+            } catch (Exception ex) {
+                report.logError("Failed to clear element: " + elementName);
+                throw new CSSmartElementException("Failed to clear element: " + elementName, e);
+            }
+        }
+    }
+    
+    @Override
+    public String getTagName() {
+        try {
+            return element.getTagName();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getTagName();
+        }
+    }
+    
+    @Override
+    public String getAttribute(String name) {
+        try {
+            return element.getAttribute(name);
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getAttribute(name);
+        }
+    }
+    
+    @Override
+    public boolean isSelected() {
+        try {
+            return element.isSelected();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.isSelected();
+        }
+    }
+    
+    @Override
+    public boolean isEnabled() {
+        try {
+            return element.isEnabled();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.isEnabled();
+        }
+    }
+    
+    @Override
+    public String getText() {
+        try {
+            return element.getText();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getText();
+        }
+    }
+    
+    @Override
+    public List<WebElement> findElements(By by) {
+        try {
+            List<WebElement> elements = element.findElements(by);
+            
+            // Convert to CSSmartWebElement
+            return elements.stream()
+                .map(e -> new CSSmartWebElement(driver, e, by, elementName + "." + by))
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            List<WebElement> elements = element.findElements(by);
+            
+            // Convert to CSSmartWebElement
+            return elements.stream()
+                .map(e -> new CSSmartWebElement(driver, e, by, elementName + "." + by))
+                .collect(Collectors.toList());
+        }
+    }
+    
+    @Override
+    public CSSmartWebElement findElement(By by) {
+        try {
+            WebElement foundElement = element.findElement(by);
+            return new CSSmartWebElement(driver, foundElement, by, elementName + "." + by);
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            WebElement foundElement = element.findElement(by);
+            return new CSSmartWebElement(driver, foundElement, by, elementName + "." + by);
+        }
+    }
+    
+    @Override
+    public boolean isDisplayed() {
+        try {
+            return element.isDisplayed();
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                healElement();
+                return element.isDisplayed();
+            } catch (Exception ex) {
+                // If healing fails, assume element is not displayed
+                return false;
+            }
+        }
+    }
+    
+    @Override
+    public Point getLocation() {
+        try {
+            return element.getLocation();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getLocation();
+        }
+    }
+    
+    @Override
+    public Dimension getSize() {
+        try {
+            return element.getSize();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getSize();
+        }
+    }
+    
+    @Override
+    public Rectangle getRect() {
+        try {
+            return element.getRect();
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getRect();
+        }
+    }
+    
+    @Override
+    public String getCssValue(String propertyName) {
+        try {
+            return element.getCssValue(propertyName);
+        } catch (Exception e) {
+            // Try to heal stale element
+            healElement();
+            return element.getCssValue(propertyName);
+        }
+    }
+    
+    @Override
+    public <X> X getScreenshotAs(OutputType<X> target) throws WebDriverException {
+        try {
+            return this.element.getScreenshotAs(target);
+        } catch (Exception e) {
+            // Try to heal stale element
+            try {
+                this.healElement();
+                return this.element.getScreenshotAs(target);
+            } catch (Exception ex) {
+                throw new WebDriverException("Failed to get screenshot after healing attempt", ex);
+            }
+        }
+    }
+    
+    /**
+     * Wait for element to be visible
+     * @param timeoutSeconds timeout in seconds
+     * @return this element
+     */
+    public CSSmartWebElement waitForVisible(int timeoutSeconds) {
+        long startTime = System.currentTimeMillis();
+        long endTime = startTime + (timeoutSeconds * 1000);
+        
+        while (System.currentTimeMillis() < endTime) {
+            try {
+                if (isDisplayed()) {
+                    return this;
+                }
+                
+                // Short pause between checks
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                // Ignore and continue waiting
+            }
+        }
+        
+        throw new CSSmartElementException("Timeout waiting for element to be visible: " + elementName);
+    }
+    
+    /**
+     * Wait for element to be clickable (visible and enabled)
+     * @param timeoutSeconds timeout in seconds
+     * @return this element
+     */
+    public CSSmartWebElement waitForClickable(int timeoutSeconds) {
+        long startTime = System.currentTimeMillis();
+        long endTime = startTime + (timeoutSeconds * 1000);
+        
+        while (System.currentTimeMillis() < endTime) {
+            try {
+                if (isDisplayed() && isEnabled()) {
+                    return this;
+                }
+                
+                // Short pause between checks
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                // Ignore and continue waiting
+            }
+        }
+        
+        throw new CSSmartElementException("Timeout waiting for element to be clickable: " + elementName);
+    }
+    
+    /**
+     * Smart click with automatic waiting
+     * @return this element
+     */
+    public CSSmartWebElement smartClick() {
+        try {
+            waitForClickable(10);
+            click();
+            return this;
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to smart click on element: " + elementName, e);
+        }
+    }
+    
+    /**
+     * Smart send keys with automatic waiting and clearing
+     * @param text the text to send
+     * @return this element
+     */
+    public CSSmartWebElement smartSendKeys(String text) {
+        try {
+            waitForVisible(10);
+            clear();
+            sendKeys(text);
+            return this;
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to smart send keys to element: " + elementName, e);
+        }
+    }
+    
+    /**
+     * Smart wait then get text
+     * @return the element text
+     */
+    public String smartGetText() {
+        try {
+            waitForVisible(10);
+            return getText();
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to smart get text from element: " + elementName, e);
+        }
+    }
+    
+    /**
+     * Take a screenshot of this element
+     * @param screenshotName the name of the screenshot
+     * @return the path to the saved screenshot
+     */
+    public String takeScreenshot(String screenshotName) {
+        try {
+            return report.takeElementScreenshot(this, screenshotName);
+        } catch (Exception e) {
+            throw new CSSmartElementException("Failed to take screenshot of element: " + elementName, e);
+        }
+    }
+}
