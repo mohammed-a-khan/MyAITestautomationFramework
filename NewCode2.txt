@@ -1,0 +1,5382 @@
+/**
+ * CSSmartTestStep.java
+ * Test step annotation for detailed reporting
+ */
+package com.cssmart.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD})
+public @interface CSSmartTestStep {
+    /**
+     * Step description
+     */
+    String description();
+    
+    /**
+     * Whether to take a screenshot after this step
+     */
+    boolean takeScreenshot() default false;
+    
+    /**
+     * Order of the step
+     */
+    int order() default 0;
+    
+    /**
+     * Importance level
+     */
+    Importance importance() default Importance.NORMAL;
+    
+    /**
+     * Enum for importance levels
+     */
+    enum Importance {
+        LOW,
+        NORMAL,
+        HIGH,
+        CRITICAL
+    }
+}
+
+/**
+ * CSSmartDataProvider.java
+ * Data provider annotation
+ */
+package com.cssmart.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface CSSmartDataProvider {
+    /**
+     * Data source type
+     */
+    DataSourceType type();
+    
+    /**
+     * Path to the data source
+     */
+    String path();
+    
+    /**
+     * Sheet name (for Excel)
+     */
+    String sheet() default "Sheet1";
+    
+    /**
+     * JSON path or key (for JSON)
+     */
+    String jsonPath() default "";
+    
+    /**
+     * SQL query (for database)
+     */
+    String query() default "";
+    
+    /**
+     * Data source type enum
+     */
+    enum DataSourceType {
+        EXCEL,
+        CSV,
+        JSON,
+        DATABASE,
+        YAML
+    }
+}
+
+/**
+ * CSSmartADOTest.java
+ * ADO test configuration annotation
+ */
+package com.cssmart.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface CSSmartADOTest {
+    /**
+     * Azure DevOps test case ID
+     */
+    String testCaseId();
+    
+    /**
+     * Whether to update test case results in ADO
+     */
+    boolean updateResults() default true;
+    
+    /**
+     * Whether to upload screenshots to ADO
+     */
+    boolean uploadScreenshots() default true;
+    
+    /**
+     * Whether to upload the test report to ADO
+     */
+    boolean uploadReport() default true;
+    
+    /**
+     * Priority in ADO
+     */
+    int priority() default 2;
+    
+    /**
+     * Description for the test case
+     */
+    String description() default "";
+}
+
+/**
+ * CSSmartAnnotationProcessor.java
+ * Central annotation processing
+ */
+package com.cssmart.annotations;
+
+import com.cssmart.ado.CSSmartADOIntegration;
+import com.cssmart.config.CSSmartConfig;
+import com.cssmart.data.CSSmartDataProviderRegistry;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+
+public class CSSmartAnnotationProcessor {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private static final CSSmartConfig config = CSSmartConfig.getInstance();
+    
+    /**
+     * Process annotations on a test class
+     * @param testClass the test class
+     */
+    public void processClassAnnotations(Class<?> testClass) {
+        logger.debug("Processing annotations for class: " + testClass.getName());
+        
+        // Process CSSmartDataProvider annotation
+        CSSmartDataProvider dataProviderAnnotation = testClass.getAnnotation(CSSmartDataProvider.class);
+        if (dataProviderAnnotation != null) {
+            processDataProviderAnnotation(dataProviderAnnotation, null);
+        }
+        
+        // Process CSSmartADOTest annotation
+        CSSmartADOTest adoTestAnnotation = testClass.getAnnotation(CSSmartADOTest.class);
+        if (adoTestAnnotation != null) {
+            processADOTestAnnotation(adoTestAnnotation, null);
+        }
+    }
+    
+    /**
+     * Process annotations on a test method
+     * @param testMethod the test method
+     * @param testInstance the test instance
+     * @param testDriver the CSSmartDriver instance
+     */
+    public void processMethodAnnotations(Method testMethod, Object testInstance, CSSmartDriver testDriver) {
+        logger.debug("Processing annotations for method: " + testMethod.getName());
+        
+        // Process CSSmartDataProvider annotation
+        CSSmartDataProvider dataProviderAnnotation = testMethod.getAnnotation(CSSmartDataProvider.class);
+        if (dataProviderAnnotation != null) {
+            processDataProviderAnnotation(dataProviderAnnotation, testMethod);
+        }
+        
+        // Process CSSmartADOTest annotation
+        CSSmartADOTest adoTestAnnotation = testMethod.getAnnotation(CSSmartADOTest.class);
+        if (adoTestAnnotation != null) {
+            processADOTestAnnotation(adoTestAnnotation, testMethod);
+        }
+    }
+    
+    /**
+     * Process CSSmartTestStep annotations in a test class
+     * @param testClass the test class
+     * @return an ordered list of methods with CSSmartTestStep annotations
+     */
+    public List<Method> processTestStepAnnotations(Class<?> testClass) {
+        logger.debug("Processing test step annotations for class: " + testClass.getName());
+        
+        // Get all methods with CSSmartTestStep annotation
+        List<Method> stepMethods = new ArrayList<>();
+        
+        for (Method method : testClass.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(CSSmartTestStep.class)) {
+                stepMethods.add(method);
+            }
+        }
+        
+        // Sort by order
+        stepMethods.sort(Comparator.comparingInt(method -> 
+            method.getAnnotation(CSSmartTestStep.class).order()));
+        
+        return stepMethods;
+    }
+    
+    /**
+     * Execute a test step method
+     * @param method the method to execute
+     * @param testInstance the test instance
+     * @param testDriver the CSSmartDriver instance
+     * @param args the method arguments
+     * @return the result of the method invocation
+     */
+    public Object executeTestStep(Method method, Object testInstance, CSSmartDriver testDriver, Object... args) {
+        CSSmartTestStep annotation = method.getAnnotation(CSSmartTestStep.class);
+        if (annotation == null) {
+            throw new CSSmartException("Method does not have CSSmartTestStep annotation: " + method.getName());
+        }
+        
+        String description = annotation.description();
+        boolean takeScreenshot = annotation.takeScreenshot();
+        CSSmartTestStep.Importance importance = annotation.importance();
+        
+        logger.info("Executing test step: " + description);
+        report.logInfo("Executing test step: " + description);
+        
+        try {
+            method.setAccessible(true);
+            Object result = method.invoke(testInstance, args);
+            
+            if (takeScreenshot && testDriver != null) {
+                String screenshotName = method.getName() + "_" + System.currentTimeMillis();
+                testDriver.takeScreenshot(screenshotName);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            report.logError("Test step failed: " + description);
+            throw new CSSmartException("Test step execution failed: " + description, e);
+        }
+    }
+    
+    /**
+     * Process CSSmartDataProvider annotation
+     * @param annotation the annotation
+     * @param method the method (null for class-level annotation)
+     */
+    private void processDataProviderAnnotation(CSSmartDataProvider annotation, Method method) {
+        CSSmartDataProviderRegistry registry = CSSmartDataProviderRegistry.getInstance();
+        
+        try {
+            switch (annotation.type()) {
+                case EXCEL:
+                    registry.registerExcelDataProvider(method, annotation.path(), annotation.sheet());
+                    break;
+                case CSV:
+                    registry.registerCSVDataProvider(method, annotation.path());
+                    break;
+                case JSON:
+                    registry.registerJSONDataProvider(method, annotation.path(), annotation.jsonPath());
+                    break;
+                case DATABASE:
+                    registry.registerDBDataProvider(method, annotation.query());
+                    break;
+                case YAML:
+                    registry.registerYAMLDataProvider(method, annotation.path());
+                    break;
+                default:
+                    throw new CSSmartException("Unsupported data provider type: " + annotation.type());
+            }
+            
+            logger.info("Registered data provider for " + (method != null ? "method: " + method.getName() : "class"));
+        } catch (Exception e) {
+            throw new CSSmartException("Failed to process data provider annotation", e);
+        }
+    }
+    
+    /**
+     * Process CSSmartADOTest annotation
+     * @param annotation the annotation
+     * @param method the method (null for class-level annotation)
+     */
+    private void processADOTestAnnotation(CSSmartADOTest annotation, Method method) {
+        // Skip if ADO integration is not enabled
+        if (!config.getBooleanProperty("ado.enabled", false)) {
+            logger.info("ADO integration is disabled, skipping ADO test annotation processing");
+            return;
+        }
+        
+        try {
+            CSSmartADOIntegration adoIntegration = CSSmartADOIntegration.getInstance();
+            
+            // Register test case mapping
+            adoIntegration.registerTestCase(
+                method != null ? method.getName() : "class-level",
+                annotation.testCaseId(),
+                annotation.updateResults(),
+                annotation.uploadScreenshots(),
+                annotation.uploadReport(),
+                annotation.priority(),
+                annotation.description()
+            );
+            
+            logger.info("Registered ADO test case mapping for " + 
+                (method != null ? "method: " + method.getName() : "class") + 
+                " with test case ID: " + annotation.testCaseId());
+        } catch (Exception e) {
+            throw new CSSmartException("Failed to process ADO test annotation", e);
+        }
+    }
+}
+
+
+
+/**
+ * CSSmartBDDTestFactory.java
+ * Test generation from Gherkin
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+import org.testng.ITestNGMethod;
+import org.testng.annotations.Test;
+import org.testng.internal.annotations.IAnnotationFinder;
+
+import java.io.File;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+public class CSSmartBDDTestFactory {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private final CSSmartBDDParser parser;
+    private final CSSmartBDDScanner scanner;
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDTestFactory() {
+        this.parser = new CSSmartBDDParser();
+        this.scanner = new CSSmartBDDScanner();
+        logger.info("Initializing CSSmartBDDTestFactory");
+    }
+    
+    /**
+     * Generate TestNG test methods from feature files
+     * @param featureFile the feature file
+     * @param stepDefinitionClasses the step definition classes
+     * @param testAnnotationFinder the TestNG annotation finder
+     * @return a list of TestNG methods
+     */
+    public List<ITestNGMethod> generateTestMethods(File featureFile, 
+                                                  List<Class<?>> stepDefinitionClasses,
+                                                  IAnnotationFinder testAnnotationFinder) {
+        logger.info("Generating test methods from feature file: " + featureFile.getName());
+        
+        List<ITestNGMethod> testMethods = new ArrayList<>();
+        
+        try {
+            // Parse feature file
+            CSSmartBDDParser.Feature feature = parser.parseFeatureFile(featureFile);
+            
+            // Scan step definitions
+            CSSmartBDDScanner.StepDefinitionRegistry registry = new CSSmartBDDScanner.StepDefinitionRegistry();
+            for (Class<?> stepDefClass : stepDefinitionClasses) {
+                scanner.scanStepDefinitions(stepDefClass, registry);
+            }
+            
+            // Generate test methods for each scenario
+            for (CSSmartBDDParser.Scenario scenario : feature.getScenarios()) {
+                // Create a TestNG method for the scenario
+                String testName = sanitizeTestName(scenario.getName());
+                
+                // Create dynamic test class
+                Class<?> dynamicTestClass = createDynamicTestClass(feature, scenario, registry);
+                
+                // Find test method in dynamic class
+                Method testMethod = findTestMethod(dynamicTestClass, testName);
+                
+                if (testMethod != null) {
+                    // Convert to TestNG method
+                    ITestNGMethod testNGMethod = createTestNGMethod(testMethod, testAnnotationFinder);
+                    testMethods.add(testNGMethod);
+                    
+                    logger.debug("Generated test method: " + testNGMethod.getMethodName());
+                }
+            }
+            
+            return testMethods;
+        } catch (Exception e) {
+            throw new CSSmartBDDException("Failed to generate test methods from feature file: " + featureFile.getName(), e);
+        }
+    }
+    
+    /**
+     * Create a dynamic test class for a scenario
+     * @param feature the feature
+     * @param scenario the scenario
+     * @param registry the step definition registry
+     * @return the dynamic test class
+     */
+    private Class<?> createDynamicTestClass(CSSmartBDDParser.Feature feature, 
+                                         CSSmartBDDParser.Scenario scenario,
+                                         CSSmartBDDScanner.StepDefinitionRegistry registry) {
+        String className = "DynamicTest_" + sanitizeTestName(scenario.getName());
+        
+        // TODO: Implement dynamic class generation using bytecode manipulation libraries like ByteBuddy
+        // This is a placeholder for the actual implementation
+        
+        // For now, create a CSSmartBDDExecutor instance that will execute this scenario
+        CSSmartBDDExecutor executor = new CSSmartBDDExecutor();
+        executor.prepareScenario(feature, scenario, registry);
+        
+        // For the purposes of this implementation, we'll return a simple class
+        // In a real implementation, this would be a dynamically generated class
+        return DynamicTestPlaceholder.class;
+    }
+    
+    /**
+     * Find a test method in a class
+     * @param testClass the test class
+     * @param testName the test name
+     * @return the test method
+     */
+    private Method findTestMethod(Class<?> testClass, String testName) {
+        try {
+            return testClass.getMethod("execute" + testName);
+        } catch (NoSuchMethodException e) {
+            throw new CSSmartBDDException("Failed to find test method: " + testName, e);
+        }
+    }
+    
+    /**
+     * Create a TestNG method
+     * @param method the method
+     * @param finder the annotation finder
+     * @return the TestNG method
+     */
+    private ITestNGMethod createTestNGMethod(Method method, IAnnotationFinder finder) {
+        // TODO: Implement TestNG method creation
+        // This requires using TestNG internal classes
+        // For now, return null as a placeholder
+        return null;
+    }
+    
+    /**
+     * Sanitize a test name
+     * @param name the name
+     * @return the sanitized name
+     */
+    private String sanitizeTestName(String name) {
+        return name.replaceAll("[^a-zA-Z0-9]", "_");
+    }
+    
+    /**
+     * Placeholder class for dynamic test generation
+     */
+    public static class DynamicTestPlaceholder {
+        @Test
+        public void executePlaceholder() {
+            // This is a placeholder method
+        }
+    }
+}
+
+/**
+ * CSSmartBDDScanner.java
+ * Step definition discovery
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+public class CSSmartBDDScanner {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDScanner() {
+        logger.info("Initializing CSSmartBDDScanner");
+    }
+    
+    /**
+     * Scan a class for step definitions
+     * @param stepDefClass the class to scan
+     * @param registry the registry to populate
+     */
+    public void scanStepDefinitions(Class<?> stepDefClass, StepDefinitionRegistry registry) {
+        logger.debug("Scanning step definitions in class: " + stepDefClass.getName());
+        
+        try {
+            Object instance = stepDefClass.getDeclaredConstructor().newInstance();
+            
+            // Scan methods
+            for (Method method : stepDefClass.getDeclaredMethods()) {
+                scanMethod(method, instance, registry);
+            }
+            
+            logger.debug("Found " + registry.size() + " step definitions");
+        } catch (Exception e) {
+            throw new CSSmartBDDException("Failed to scan step definitions: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Scan a method for step annotations
+     * @param method the method to scan
+     * @param instance the class instance
+     * @param registry the registry to populate
+     */
+    private void scanMethod(Method method, Object instance, StepDefinitionRegistry registry) {
+        // Check for Given annotation
+        Given givenAnnotation = method.getAnnotation(Given.class);
+        if (givenAnnotation != null) {
+            StepDefinition stepDef = new StepDefinition(
+                StepType.GIVEN, 
+                givenAnnotation.value(), 
+                method, 
+                instance
+            );
+            registry.addStepDefinition(stepDef);
+            logger.debug("Found Given step: " + givenAnnotation.value());
+        }
+        
+        // Check for When annotation
+        When whenAnnotation = method.getAnnotation(When.class);
+        if (whenAnnotation != null) {
+            StepDefinition stepDef = new StepDefinition(
+                StepType.WHEN, 
+                whenAnnotation.value(), 
+                method, 
+                instance
+            );
+            registry.addStepDefinition(stepDef);
+            logger.debug("Found When step: " + whenAnnotation.value());
+        }
+        
+        // Check for Then annotation
+        Then thenAnnotation = method.getAnnotation(Then.class);
+        if (thenAnnotation != null) {
+            StepDefinition stepDef = new StepDefinition(
+                StepType.THEN, 
+                thenAnnotation.value(), 
+                method, 
+                instance
+            );
+            registry.addStepDefinition(stepDef);
+            logger.debug("Found Then step: " + thenAnnotation.value());
+        }
+        
+        // Check for And annotation
+        And andAnnotation = method.getAnnotation(And.class);
+        if (andAnnotation != null) {
+            StepDefinition stepDef = new StepDefinition(
+                StepType.AND, 
+                andAnnotation.value(), 
+                method, 
+                instance
+            );
+            registry.addStepDefinition(stepDef);
+            logger.debug("Found And step: " + andAnnotation.value());
+        }
+        
+        // Check for But annotation
+        But butAnnotation = method.getAnnotation(But.class);
+        if (butAnnotation != null) {
+            StepDefinition stepDef = new StepDefinition(
+                StepType.BUT, 
+                butAnnotation.value(), 
+                method, 
+                instance
+            );
+            registry.addStepDefinition(stepDef);
+            logger.debug("Found But step: " + butAnnotation.value());
+        }
+    }
+    
+    /**
+     * Step definition registry
+     */
+    public static class StepDefinitionRegistry {
+        private final Map<StepType, Map<Pattern, StepDefinition>> stepDefinitions = new HashMap<>();
+        
+        /**
+         * Constructor
+         */
+        public StepDefinitionRegistry() {
+            // Initialize maps for each step type
+            for (StepType type : StepType.values()) {
+                stepDefinitions.put(type, new HashMap<>());
+            }
+        }
+        
+        /**
+         * Add a step definition
+         * @param stepDef the step definition
+         */
+        public void addStepDefinition(StepDefinition stepDef) {
+            Pattern pattern = Pattern.compile(stepDef.getPattern());
+            stepDefinitions.get(stepDef.getType()).put(pattern, stepDef);
+        }
+        
+        /**
+         * Find a step definition
+         * @param type the step type
+         * @param text the step text
+         * @return the matching step definition or null if not found
+         */
+        public StepDefinition findStepDefinition(StepType type, String text) {
+            Map<Pattern, StepDefinition> typeSteps = stepDefinitions.get(type);
+            
+            for (Map.Entry<Pattern, StepDefinition> entry : typeSteps.entrySet()) {
+                if (entry.getKey().matcher(text).matches()) {
+                    return entry.getValue();
+                }
+            }
+            
+            // If AND or BUT and not found, try looking in the other step types
+            if (type == StepType.AND || type == StepType.BUT) {
+                for (StepType otherType : new StepType[]{StepType.GIVEN, StepType.WHEN, StepType.THEN}) {
+                    StepDefinition found = findStepDefinition(otherType, text);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        /**
+         * Get the size of the registry
+         * @return the number of step definitions
+         */
+        public int size() {
+            int total = 0;
+            for (Map<Pattern, StepDefinition> typeSteps : stepDefinitions.values()) {
+                total += typeSteps.size();
+            }
+            return total;
+        }
+    }
+    
+    /**
+     * Step definition class
+     */
+    public static class StepDefinition {
+        private final StepType type;
+        private final String pattern;
+        private final Method method;
+        private final Object instance;
+        
+        /**
+         * Constructor
+         * @param type the step type
+         * @param pattern the pattern
+         * @param method the method
+         * @param instance the instance
+         */
+        public StepDefinition(StepType type, String pattern, Method method, Object instance) {
+            this.type = type;
+            this.pattern = pattern;
+            this.method = method;
+            this.instance = instance;
+        }
+        
+        /**
+         * Get the step type
+         * @return the step type
+         */
+        public StepType getType() {
+            return type;
+        }
+        
+        /**
+         * Get the pattern
+         * @return the pattern
+         */
+        public String getPattern() {
+            return pattern;
+        }
+        
+        /**
+         * Get the method
+         * @return the method
+         */
+        public Method getMethod() {
+            return method;
+        }
+        
+        /**
+         * Get the instance
+         * @return the instance
+         */
+        public Object getInstance() {
+            return instance;
+        }
+        
+        /**
+         * Execute the step
+         * @param args the arguments
+         * @return the result
+         */
+        public Object execute(Object... args) {
+            try {
+                method.setAccessible(true);
+                return method.invoke(instance, args);
+            } catch (Exception e) {
+                throw new CSSmartBDDException("Failed to execute step: " + pattern, e);
+            }
+        }
+    }
+    
+    /**
+     * Enum for step types
+     */
+    public enum StepType {
+        GIVEN,
+        WHEN,
+        THEN,
+        AND,
+        BUT
+    }
+    
+    /**
+     * Given annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface Given {
+        String value();
+    }
+    
+    /**
+     * When annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface When {
+        String value();
+    }
+    
+    /**
+     * Then annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface Then {
+        String value();
+    }
+    
+    /**
+     * And annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface And {
+        String value();
+    }
+    
+    /**
+     * But annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface But {
+        String value();
+    }
+}
+
+/**
+ * CSSmartBDDExecutor.java
+ * Scenario execution engine
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class CSSmartBDDExecutor {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    
+    private CSSmartBDDParser.Feature currentFeature;
+    private CSSmartBDDParser.Scenario currentScenario;
+    private CSSmartBDDScanner.StepDefinitionRegistry stepRegistry;
+    private CSSmartBDDContext context;
+    private List<CSSmartBDDHooks.Hook> beforeScenarioHooks;
+    private List<CSSmartBDDHooks.Hook> afterScenarioHooks;
+    private List<CSSmartBDDHooks.Hook> beforeStepHooks;
+    private List<CSSmartBDDHooks.Hook> afterStepHooks;
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDExecutor() {
+        logger.info("Initializing CSSmartBDDExecutor");
+        this.beforeScenarioHooks = new ArrayList<>();
+        this.afterScenarioHooks = new ArrayList<>();
+        this.beforeStepHooks = new ArrayList<>();
+        this.afterStepHooks = new ArrayList<>();
+    }
+    
+    /**
+     * Prepare a scenario for execution
+     * @param feature the feature
+     * @param scenario the scenario
+     * @param registry the step definition registry
+     */
+    public void prepareScenario(CSSmartBDDParser.Feature feature, 
+                               CSSmartBDDParser.Scenario scenario,
+                               CSSmartBDDScanner.StepDefinitionRegistry registry) {
+        this.currentFeature = feature;
+        this.currentScenario = scenario;
+        this.stepRegistry = registry;
+        this.context = new CSSmartBDDContext();
+        
+        logger.info("Preparing scenario: " + scenario.getName());
+    }
+    
+    /**
+     * Register hooks
+     * @param hookClass the hook class
+     */
+    public void registerHooks(Class<?> hookClass) {
+        try {
+            CSSmartBDDHooks hookScanner = new CSSmartBDDHooks();
+            Object instance = hookClass.getDeclaredConstructor().newInstance();
+            
+            beforeScenarioHooks.addAll(hookScanner.findBeforeScenarioHooks(hookClass, instance));
+            afterScenarioHooks.addAll(hookScanner.findAfterScenarioHooks(hookClass, instance));
+            beforeStepHooks.addAll(hookScanner.findBeforeStepHooks(hookClass, instance));
+            afterStepHooks.addAll(hookScanner.findAfterStepHooks(hookClass, instance));
+            
+            logger.debug("Registered hooks from class: " + hookClass.getName());
+        } catch (Exception e) {
+            throw new CSSmartBDDException("Failed to register hooks: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Execute the scenario
+     * @return the result of the execution
+     */
+    public boolean executeScenario() {
+        logger.info("Executing scenario: " + currentScenario.getName());
+        report.logInfo("Executing scenario: " + currentScenario.getName());
+        
+        try {
+            // Execute before scenario hooks
+            executeHooks(beforeScenarioHooks);
+            
+            // Execute steps
+            for (CSSmartBDDParser.Step step : currentScenario.getSteps()) {
+                boolean stepResult = executeStep(step);
+                if (!stepResult) {
+                    // Step failed, skip remaining steps
+                    logger.error("Step failed, skipping remaining steps");
+                    report.logError("Step failed, skipping remaining steps");
+                    return false;
+                }
+            }
+            
+            // All steps passed
+            return true;
+        } catch (Exception e) {
+            logger.error("Scenario execution failed: " + e.getMessage());
+            report.logError("Scenario execution failed: " + e.getMessage());
+            return false;
+        } finally {
+            // Execute after scenario hooks
+            try {
+                executeHooks(afterScenarioHooks);
+            } catch (Exception e) {
+                logger.error("After scenario hooks execution failed: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Execute a step
+     * @param step the step to execute
+     * @return true if the step passed, false otherwise
+     */
+    private boolean executeStep(CSSmartBDDParser.Step step) {
+        logger.debug("Executing step: " + step.getText());
+        report.logInfo("Executing step: " + step.getText());
+        
+        try {
+            // Execute before step hooks
+            executeHooks(beforeStepHooks);
+            
+            // Find matching step definition
+            CSSmartBDDScanner.StepDefinition stepDef = stepRegistry.findStepDefinition(step.getType(), step.getText());
+            
+            if (stepDef == null) {
+                throw new CSSmartBDDException("No matching step definition found for: " + step.getText(), 
+                                           currentFeature.getName(), 
+                                           currentScenario.getName(), 
+                                           step.getLineNumber());
+            }
+            
+            // Extract parameters from step text
+            Object[] parameters = extractParameters(stepDef.getPattern(), step.getText());
+            
+            // Add context as last parameter if the method expects it
+            if (stepDef.getMethod().getParameterCount() > parameters.length &&
+                stepDef.getMethod().getParameterTypes()[parameters.length].equals(CSSmartBDDContext.class)) {
+                Object[] newParams = new Object[parameters.length + 1];
+                System.arraycopy(parameters, 0, newParams, 0, parameters.length);
+                newParams[parameters.length] = context;
+                parameters = newParams;
+            }
+            
+            // Execute step
+            Object result = stepDef.execute(parameters);
+            
+            // Check result
+            if (result instanceof Boolean) {
+                boolean success = (Boolean) result;
+                if (!success) {
+                    logger.error("Step returned false: " + step.getText());
+                    report.logError("Step returned false: " + step.getText());
+                    return false;
+                }
+            }
+            
+            // Step passed
+            return true;
+        } catch (Exception e) {
+            logger.error("Step execution failed: " + step.getText() + " - " + e.getMessage());
+            report.logError("Step execution failed: " + step.getText() + " - " + e.getMessage());
+            return false;
+        } finally {
+            // Execute after step hooks
+            try {
+                executeHooks(afterStepHooks);
+            } catch (Exception e) {
+                logger.error("After step hooks execution failed: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Execute hooks
+     * @param hooks the hooks to execute
+     */
+    private void executeHooks(List<CSSmartBDDHooks.Hook> hooks) {
+        for (CSSmartBDDHooks.Hook hook : hooks) {
+            try {
+                hook.execute(context);
+            } catch (Exception e) {
+                logger.error("Hook execution failed: " + e.getMessage());
+                throw new CSSmartBDDException("Hook execution failed: " + e.getMessage(), e);
+            }
+        }
+    }
+    
+    /**
+     * Extract parameters from step text
+     * @param pattern the pattern
+     * @param text the text
+     * @return the extracted parameters
+     */
+    private Object[] extractParameters(String pattern, String text) {
+        // Convert Cucumber expression to regex
+        String regex = pattern.replaceAll("\\{[^}]+\\}", "([^\\s]+)");
+        Pattern compiledPattern = Pattern.compile(regex);
+        Matcher matcher = compiledPattern.matcher(text);
+        
+        if (matcher.matches()) {
+            List<Object> params = new ArrayList<>();
+            for (int i = 1; i <= matcher.groupCount(); i++) {
+                String value = matcher.group(i);
+                
+                // Try to convert to appropriate type
+                if (value.matches("\\d+")) {
+                    params.add(Integer.parseInt(value));
+                } else if (value.matches("\\d+\\.\\d+")) {
+                    params.add(Double.parseDouble(value));
+                } else if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+                    params.add(Boolean.parseBoolean(value));
+                } else {
+                    params.add(value);
+                }
+            }
+            
+            return params.toArray();
+        }
+        
+        // No parameters
+        return new Object[0];
+    }
+}
+
+/**
+ * CSSmartBDDParser.java
+ * Gherkin file processing
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class CSSmartBDDParser {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDParser() {
+        logger.info("Initializing CSSmartBDDParser");
+    }
+    
+    /**
+     * Parse a feature file
+     * @param featureFile the feature file
+     * @return the parsed feature
+     */
+    public Feature parseFeatureFile(File featureFile) {
+        logger.debug("Parsing feature file: " + featureFile.getName());
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(featureFile))) {
+            String line;
+            int lineNumber = 0;
+            StringBuilder description = new StringBuilder();
+            
+            String featureName = null;
+            List<String> tags = new ArrayList<>();
+            List<Scenario> scenarios = new ArrayList<>();
+            Map<String, String> dataTable = new HashMap<>();
+            
+            // Current scenario being parsed
+            Scenario currentScenario = null;
+            
+            // Parse file line by line
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                line = line.trim();
+                
+                // Skip empty lines and comments
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                
+                // Parse tags
+                if (line.startsWith("@")) {
+                    String[] lineTags = line.split("\\s+");
+                    for (String tag : lineTags) {
+                        if (tag.startsWith("@")) {
+                            tags.add(tag);
+                        }
+                    }
+                    continue;
+                }
+                
+                // Parse feature
+                if (line.startsWith("Feature:")) {
+                    featureName = line.substring("Feature:".length()).trim();
+                    continue;
+                }
+                
+                // Parse feature description
+                if (featureName != null && currentScenario == null && !line.startsWith("Scenario:") && !line.startsWith("Scenario Outline:")) {
+                    description.append(line).append("\n");
+                    continue;
+                }
+                
+                // Parse scenario
+                if (line.startsWith("Scenario:") || line.startsWith("Scenario Outline:")) {
+                    // Add previous scenario if exists
+                    if (currentScenario != null) {
+                        scenarios.add(currentScenario);
+                    }
+                    
+                    boolean isOutline = line.startsWith("Scenario Outline:");
+                    String prefix = isOutline ? "Scenario Outline:" : "Scenario:";
+                    String scenarioName = line.substring(prefix.length()).trim();
+                    
+                    currentScenario = new Scenario(scenarioName, new ArrayList<>(tags), isOutline);
+                    tags.clear(); // Reset tags for next scenario
+                    continue;
+                }
+                
+                // Parse examples
+                if (line.startsWith("Examples:")) {
+                    if (currentScenario != null && currentScenario.isOutline()) {
+                        currentScenario.setHasExamples(true);
+                    }
+                    continue;
+                }
+                
+                // Parse data table for examples
+                if (currentScenario != null && currentScenario.isOutline() && currentScenario.hasExamples() && line.contains("|")) {
+                    // First row of examples is the header
+                    if (currentScenario.getExamplesHeader() == null) {
+                        // Parse header row
+                        String[] headers = line.split("\\|");
+                        List<String> headerList = new ArrayList<>();
+                        for (String header : headers) {
+                            header = header.trim();
+                            if (!header.isEmpty()) {
+                                headerList.add(header);
+                            }
+                        }
+                        currentScenario.setExamplesHeader(headerList);
+                    } else {
+                        // Parse data row
+                        String[] cells = line.split("\\|");
+                        List<String> dataRow = new ArrayList<>();
+                        for (String cell : cells) {
+                            cell = cell.trim();
+                            if (!cell.isEmpty()) {
+                                dataRow.add(cell);
+                            }
+                        }
+                        currentScenario.addExamplesRow(dataRow);
+                    }
+                    continue;
+                }
+                
+                // Parse TestDataProvider tag
+                if (line.contains("@TestDataProvider")) {
+                    Pattern pattern = Pattern.compile("@TestDataProvider\\(([^)]+)\\)");
+                    Matcher matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        String params = matcher.group(1);
+                        Map<String, String> paramMap = parseTagParameters(params);
+                        if (currentScenario != null) {
+                            currentScenario.setDataProvider(paramMap);
+                        }
+                    }
+                    continue;
+                }
+                
+                // Parse step
+                if (currentScenario != null && (line.startsWith("Given ") || 
+                                              line.startsWith("When ") || 
+                                              line.startsWith("Then ") || 
+                                              line.startsWith("And ") || 
+                                              line.startsWith("But "))) {
+                    CSSmartBDDScanner.StepType stepType;
+                    String stepText;
+                    
+                    if (line.startsWith("Given ")) {
+                        stepType = CSSmartBDDScanner.StepType.GIVEN;
+                        stepText = line.substring("Given ".length()).trim();
+                    } else if (line.startsWith("When ")) {
+                        stepType = CSSmartBDDScanner.StepType.WHEN;
+                        stepText = line.substring("When ".length()).trim();
+                    } else if (line.startsWith("Then ")) {
+                        stepType = CSSmartBDDScanner.StepType.THEN;
+                        stepText = line.substring("Then ".length()).trim();
+                    } else if (line.startsWith("And ")) {
+                        stepType = CSSmartBDDScanner.StepType.AND;
+                        stepText = line.substring("And ".length()).trim();
+                    } else { // But
+                        stepType = CSSmartBDDScanner.StepType.BUT;
+                        stepText = line.substring("But ".length()).trim();
+                    }
+                    
+                    Step step = new Step(stepType, stepText, lineNumber);
+                    currentScenario.addStep(step);
+                    continue;
+                }
+            }
+            
+            // Add the last scenario
+            if (currentScenario != null) {
+                scenarios.add(currentScenario);
+            }
+            
+            // Create feature
+            Feature feature = new Feature(featureFile.getName(), featureName, description.toString().trim(), scenarios);
+            
+            logger.debug("Parsed feature: " + featureName + " with " + scenarios.size() + " scenarios");
+            
+            return feature;
+        } catch (IOException e) {
+            throw new CSSmartBDDException("Failed to parse feature file: " + featureFile.getName(), e);
+        }
+    }
+    
+    /**
+     * Parse tag parameters
+     * @param params the parameter string
+     * @return a map of parameter names to values
+     */
+    private Map<String, String> parseTagParameters(String params) {
+        Map<String, String> paramMap = new HashMap<>();
+        
+        // Simple key-value parser, can be extended for more complex parsing
+        String[] pairs = params.split(",");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].trim();
+                
+                // Remove quotes
+                if (value.startsWith("\"") && value.endsWith("\"")) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                
+                paramMap.put(key, value);
+            }
+        }
+        
+        return paramMap;
+    }
+    
+    /**
+     * Feature class
+     */
+    public static class Feature {
+        private final String fileName;
+        private final String name;
+        private final String description;
+        private final List<Scenario> scenarios;
+        
+        /**
+         * Constructor
+         * @param fileName the file name
+         * @param name the feature name
+         * @param description the feature description
+         * @param scenarios the scenarios
+         */
+        public Feature(String fileName, String name, String description, List<Scenario> scenarios) {
+            this.fileName = fileName;
+            this.name = name;
+            this.description = description;
+            this.scenarios = scenarios;
+        }
+        
+        /**
+         * Get the file name
+         * @return the file name
+         */
+        public String getFileName() {
+            return fileName;
+        }
+        
+        /**
+         * Get the feature name
+         * @return the feature name
+         */
+        public String getName() {
+            return name;
+        }
+        
+        /**
+         * Get the feature description
+         * @return the feature description
+         */
+        public String getDescription() {
+            return description;
+        }
+        
+        /**
+         * Get the scenarios
+         * @return the scenarios
+         */
+        public List<Scenario> getScenarios() {
+            return scenarios;
+        }
+    }
+    
+    /**
+     * Scenario class
+     */
+    public static class Scenario {
+        private final String name;
+        private final List<String> tags;
+        private final boolean isOutline;
+        private boolean hasExamples;
+        private List<String> examplesHeader;
+        private List<List<String>> examplesRows;
+        private final List<Step> steps;
+        private Map<String, String> dataProvider;
+        
+        /**
+         * Constructor
+         * @param name the scenario name
+         * @param tags the tags
+         * @param isOutline whether this is a scenario outline
+         */
+        public Scenario(String name, List<String> tags, boolean isOutline) {
+            this.name = name;
+            this.tags = tags;
+            this.isOutline = isOutline;
+            this.hasExamples = false;
+            this.examplesRows = new ArrayList<>();
+            this.steps = new ArrayList<>();
+            this.dataProvider = new HashMap<>();
+        }
+        
+        /**
+         * Get the scenario name
+         * @return the scenario name
+         */
+        public String getName() {
+            return name;
+        }
+        
+        /**
+         * Get the tags
+         * @return the tags
+         */
+        public List<String> getTags() {
+            return tags;
+        }
+        
+        /**
+         * Check if this is a scenario outline
+         * @return true if this is a scenario outline
+         */
+        public boolean isOutline() {
+            return isOutline;
+        }
+        
+        /**
+         * Check if this scenario has examples
+         * @return true if this scenario has examples
+         */
+        public boolean hasExamples() {
+            return hasExamples;
+        }
+        
+        /**
+         * Set whether this scenario has examples
+         * @param hasExamples whether this scenario has examples
+         */
+        public void setHasExamples(boolean hasExamples) {
+            this.hasExamples = hasExamples;
+        }
+        
+        /**
+         * Get the examples header
+         * @return the examples header
+         */
+        public List<String> getExamplesHeader() {
+            return examplesHeader;
+        }
+        
+        /**
+         * Set the examples header
+         * @param examplesHeader the examples header
+         */
+        public void setExamplesHeader(List<String> examplesHeader) {
+            this.examplesHeader = examplesHeader;
+        }
+        
+        /**
+         * Get the examples rows
+         * @return the examples rows
+         */
+        public List<List<String>> getExamplesRows() {
+            return examplesRows;
+        }
+        
+        /**
+         * Add an examples row
+         * @param row the row
+         */
+        public void addExamplesRow(List<String> row) {
+            examplesRows.add(row);
+        }
+        
+        /**
+         * Get the steps
+         * @return the steps
+         */
+        public List<Step> getSteps() {
+            return steps;
+        }
+        
+        /**
+         * Add a step
+         * @param step the step
+         */
+        public void addStep(Step step) {
+            steps.add(step);
+        }
+        
+        /**
+         * Get the data provider
+         * @return the data provider
+         */
+        public Map<String, String> getDataProvider() {
+            return dataProvider;
+        }
+        
+        /**
+         * Set the data provider
+         * @param dataProvider the data provider
+         */
+        public void setDataProvider(Map<String, String> dataProvider) {
+            this.dataProvider = dataProvider;
+        }
+    }
+    
+    /**
+     * Step class
+     */
+    public static class Step {
+        private final CSSmartBDDScanner.StepType type;
+        private final String text;
+        private final int lineNumber;
+        
+        /**
+         * Constructor
+         * @param type the step type
+         * @param text the step text
+         * @param lineNumber the line number
+         */
+        public Step(CSSmartBDDScanner.StepType type, String text, int lineNumber) {
+            this.type = type;
+            this.text = text;
+            this.lineNumber = lineNumber;
+        }
+        
+        /**
+         * Get the step type
+         * @return the step type
+         */
+        public CSSmartBDDScanner.StepType getType() {
+            return type;
+        }
+        
+        /**
+         * Get the step text
+         * @return the step text
+         */
+        public String getText() {
+            return text;
+        }
+        
+        /**
+         * Get the line number
+         * @return the line number
+         */
+        public int getLineNumber() {
+            return lineNumber;
+        }
+    }
+}
+
+/**
+ * CSSmartBDDHooks.java
+ * Before/After hooks at scenario/step levels
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+public class CSSmartBDDHooks {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDHooks() {
+        logger.info("Initializing CSSmartBDDHooks");
+    }
+    
+    /**
+     * Find before scenario hooks
+     * @param hookClass the hook class
+     * @param instance the instance
+     * @return a list of hooks
+     */
+    public List<Hook> findBeforeScenarioHooks(Class<?> hookClass, Object instance) {
+        logger.debug("Finding before scenario hooks in class: " + hookClass.getName());
+        
+        List<Hook> hooks = new ArrayList<>();
+        
+        for (Method method : hookClass.getDeclaredMethods()) {
+            BeforeScenario annotation = method.getAnnotation(BeforeScenario.class);
+            if (annotation != null) {
+                hooks.add(new Hook(method, instance, annotation.order()));
+            }
+        }
+        
+        // Sort by order
+        hooks.sort((h1, h2) -> Integer.compare(h1.getOrder(), h2.getOrder()));
+        
+        return hooks;
+    }
+    
+    /**
+     * Find after scenario hooks
+     * @param hookClass the hook class
+     * @param instance the instance
+     * @return a list of hooks
+     */
+    public List<Hook> findAfterScenarioHooks(Class<?> hookClass, Object instance) {
+        logger.debug("Finding after scenario hooks in class: " + hookClass.getName());
+        
+        List<Hook> hooks = new ArrayList<>();
+        
+        for (Method method : hookClass.getDeclaredMethods()) {
+            AfterScenario annotation = method.getAnnotation(AfterScenario.class);
+            if (annotation != null) {
+                hooks.add(new Hook(method, instance, annotation.order()));
+            }
+        }
+        
+        // Sort by order (reverse for after hooks)
+        hooks.sort((h1, h2) -> Integer.compare(h2.getOrder(), h1.getOrder()));
+        
+        return hooks;
+    }
+    
+    /**
+     * Find before step hooks
+     * @param hookClass the hook class
+     * @param instance the instance
+     * @return a list of hooks
+     */
+    public List<Hook> findBeforeStepHooks(Class<?> hookClass, Object instance) {
+        logger.debug("Finding before step hooks in class: " + hookClass.getName());
+        
+        List<Hook> hooks = new ArrayList<>();
+        
+        for (Method method : hookClass.getDeclaredMethods()) {
+            BeforeStep annotation = method.getAnnotation(BeforeStep.class);
+            if (annotation != null) {
+                hooks.add(new Hook(method, instance, annotation.order()));
+            }
+        }
+        
+        // Sort by order
+        hooks.sort((h1, h2) -> Integer.compare(h1.getOrder(), h2.getOrder()));
+        
+        return hooks;
+    }
+    
+    /**
+     * Find after step hooks
+     * @param hookClass the hook class
+     * @param instance the instance
+     * @return a list of hooks
+     */
+    public List<Hook> findAfterStepHooks(Class<?> hookClass, Object instance) {
+        logger.debug("Finding after step hooks in class: " + hookClass.getName());
+        
+        List<Hook> hooks = new ArrayList<>();
+        
+        for (Method method : hookClass.getDeclaredMethods()) {
+            AfterStep annotation = method.getAnnotation(AfterStep.class);
+            if (annotation != null) {
+                hooks.add(new Hook(method, instance, annotation.order()));
+            }
+        }
+        
+        // Sort by order (reverse for after hooks)
+        hooks.sort((h1, h2) -> Integer.compare(h2.getOrder(), h1.getOrder()));
+        
+        return hooks;
+    }
+    
+    /**
+     * Hook class
+     */
+    public static class Hook {
+        private final Method method;
+        private final Object instance;
+        private final int order;
+        
+        /**
+         * Constructor
+         * @param method the method
+         * @param instance the instance
+         * @param order the order
+         */
+        public Hook(Method method, Object instance, int order) {
+            this.method = method;
+            this.instance = instance;
+            this.order = order;
+        }
+        
+        /**
+         * Get the order
+         * @return the order
+         */
+        public int getOrder() {
+            return order;
+        }
+        
+        /**
+         * Execute the hook
+         * @param context the context
+         * @return the result
+         */
+        public Object execute(CSSmartBDDContext context) {
+            try {
+                method.setAccessible(true);
+                
+                // Check if method accepts context
+                if (method.getParameterCount() == 1 && 
+                    method.getParameterTypes()[0].equals(CSSmartBDDContext.class)) {
+                    return method.invoke(instance, context);
+                } else {
+                    return method.invoke(instance);
+                }
+            } catch (Exception e) {
+                throw new CSSmartBDDException("Failed to execute hook: " + method.getName(), e);
+            }
+        }
+    }
+    
+    /**
+     * Before scenario annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface BeforeScenario {
+        /**
+         * Order of execution
+         */
+        int order() default 0;
+        
+        /**
+         * Tags to filter on
+         */
+        String[] tags() default {};
+    }
+    
+    /**
+     * After scenario annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface AfterScenario {
+        /**
+         * Order of execution
+         */
+        int order() default 0;
+        
+        /**
+         * Tags to filter on
+         */
+        String[] tags() default {};
+    }
+    
+    /**
+     * Before step annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface BeforeStep {
+        /**
+         * Order of execution
+         */
+        int order() default 0;
+        
+        /**
+         * Step types to filter on
+         */
+        CSSmartBDDScanner.StepType[] stepTypes() default {};
+    }
+    
+    /**
+     * After step annotation
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface AfterStep {
+        /**
+         * Order of execution
+         */
+        int order() default 0;
+        
+        /**
+         * Step types to filter on
+         */
+        CSSmartBDDScanner.StepType[] stepTypes() default {};
+    }
+}
+
+/**
+ * CSSmartBDDContext.java
+ * Thread-isolated context sharing
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class CSSmartBDDContext {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final ThreadLocal<Map<String, Object>> contextStore = ThreadLocal.withInitial(HashMap::new);
+    
+    private CSSmartDriver driver;
+    
+    /**
+     * Constructor
+     */
+    public CSSmartBDDContext() {
+        logger.debug("Creating new BDD context");
+    }
+    
+    /**
+     * Get a value from the context
+     * @param key the key
+     * @return the value
+     */
+    public Object get(String key) {
+        return contextStore.get().get(key);
+    }
+    
+    /**
+     * Get a value from the context with a specific type
+     * @param <T> the type
+     * @param key the key
+     * @param type the class of the type
+     * @return the value
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T get(String key, Class<T> type) {
+        Object value = get(key);
+        if (value == null) {
+            return null;
+        }
+        
+        if (type.isInstance(value)) {
+            return (T) value;
+        }
+        
+        throw new CSSmartBDDException("Value for key '" + key + "' is not of type " + type.getName());
+    }
+    
+    /**
+     * Set a value in the context
+     * @param key the key
+     * @param value the value
+     */
+    public void set(String key, Object value) {
+        contextStore.get().put(key, value);
+    }
+    
+    /**
+     * Check if a key exists
+     * @param key the key
+     * @return true if the key exists
+     */
+    public boolean has(String key) {
+        return contextStore.get().containsKey(key);
+    }
+    
+    /**
+     * Remove a value from the context
+     * @param key the key
+     */
+    public void remove(String key) {
+        contextStore.get().remove(key);
+    }
+    
+    /**
+     * Clear the context
+     */
+    public void clear() {
+        contextStore.get().clear();
+    }
+    
+    /**
+     * Get all values from the context
+     * @return a map of all values
+     */
+    public Map<String, Object> getAll() {
+        return new HashMap<>(contextStore.get());
+    }
+    
+    /**
+     * Set the driver
+     * @param driver the driver
+     */
+    public void setDriver(CSSmartDriver driver) {
+        this.driver = driver;
+    }
+    
+    /**
+     * Get the driver
+     * @return the driver
+     */
+    public CSSmartDriver getDriver() {
+        return driver;
+    }
+    
+    /**
+     * Clear the context for the current thread
+     */
+    public static void clearContext() {
+        contextStore.remove();
+    }
+}
+
+/**
+ * CSSmartCodelessRunner.java
+ * Execute tests from feature files with zero coding
+ */
+package com.cssmart.bdd;
+
+import com.cssmart.base.CSSmartBaseSetup;
+import com.cssmart.base.CSSmartBaseTeardown;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.exceptions.CSSmartBDDException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+import org.testng.TestNG;
+import org.testng.xml.XmlClass;
+import org.testng.xml.XmlSuite;
+import org.testng.xml.XmlTest;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class CSSmartCodelessRunner {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private final CSSmartBDDParser parser;
+    private final CSSmartBDDExecutor executor;
+    private final CSSmartBaseSetup setup;
+    private final CSSmartBaseTeardown teardown;
+    
+    /**
+     * Constructor
+     */
+    public CSSmartCodelessRunner() {
+        this.parser = new CSSmartBDDParser();
+        this.executor = new CSSmartBDDExecutor();
+        this.setup = new CSSmartBaseSetup();
+        this.teardown = new CSSmartBaseTeardown();
+        logger.info("Initializing CSSmartCodelessRunner");
+    }
+    
+    /**
+     * Run feature files
+     * @param featureFiles the feature files
+     * @param stepDefinitionPackages the packages containing step definitions
+     */
+    public void runFeatures(List<File> featureFiles, List<String> stepDefinitionPackages) {
+        logger.info("Running " + featureFiles.size() + " feature files");
+        report.logInfo("Running " + featureFiles.size() + " feature files");
+        
+        try {
+            // Initialize driver
+            CSSmartDriver driver = setup.initializeDriver();
+            
+            // Find step definition classes
+            List<Class<?>> stepDefinitionClasses = findStepDefinitionClasses(stepDefinitionPackages);
+            
+            // Initialize scanner with step definitions
+            CSSmartBDDScanner scanner = new CSSmartBDDScanner();
+            CSSmartBDDScanner.StepDefinitionRegistry registry = new CSSmartBDDScanner.StepDefinitionRegistry();
+            
+            for (Class<?> stepDefClass : stepDefinitionClasses) {
+                scanner.scanStepDefinitions(stepDefClass, registry);
+            }
+            
+            // Process each feature file
+            for (File featureFile : featureFiles) {
+                runFeature(featureFile, registry, driver);
+            }
+            
+            // Quit driver
+            teardown.quitDriver(driver);
+            
+            logger.info("Finished running " + featureFiles.size() + " feature files");
+            report.logInfo("Finished running " + featureFiles.size() + " feature files");
+        } catch (Exception e) {
+            logger.error("Failed to run features: " + e.getMessage());
+            report.logError("Failed to run features: " + e.getMessage());
+            throw new CSSmartBDDException("Failed to run features: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Run a feature file
+     * @param featureFile the feature file
+     * @param registry the step definition registry
+     * @param driver the driver
+     */
+    private void runFeature(File featureFile, CSSmartBDDScanner.StepDefinitionRegistry registry, CSSmartDriver driver) {
+        logger.info("Running feature file: " + featureFile.getName());
+        report.logInfo("Running feature file: " + featureFile.getName());
+        
+        try {
+            // Parse feature file
+            CSSmartBDDParser.Feature feature = parser.parseFeatureFile(featureFile);
+            
+            // Start feature reporting
+            report.startSuite(feature.getName());
+            
+            // Run each scenario
+            for (CSSmartBDDParser.Scenario scenario : feature.getScenarios()) {
+                runScenario(feature, scenario, registry, driver);
+            }
+            
+            // End feature reporting
+            report.endSuite();
+            
+            logger.info("Finished running feature: " + feature.getName());
+            report.logInfo("Finished running feature: " + feature.getName());
+        } catch (Exception e) {
+            logger.error("Failed to run feature: " + featureFile.getName() + " - " + e.getMessage());
+            report.logError("Failed to run feature: " + featureFile.getName() + " - " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Run a scenario
+     * @param feature the feature
+     * @param scenario the scenario
+     * @param registry the step definition registry
+     * @param driver the driver
+     */
+    private void runScenario(CSSmartBDDParser.Feature feature, CSSmartBDDParser.Scenario scenario, 
+                           CSSmartBDDScanner.StepDefinitionRegistry registry, CSSmartDriver driver) {
+        logger.info("Running scenario: " + scenario.getName());
+        
+        // Start scenario reporting
+        report.startTest(scenario.getName(), "");
+        
+        try {
+            // Create context
+            CSSmartBDDContext context = new CSSmartBDDContext();
+            context.setDriver(driver);
+            
+            // Prepare executor
+            executor.prepareScenario(feature, scenario, registry);
+            
+            // Execute scenario
+            boolean result = executor.executeScenario();
+            
+            // End scenario reporting
+            report.endTest(createTestResult(scenario.getName(), result));
+            
+            logger.info("Finished running scenario: " + scenario.getName() + " with result: " + (result ? "PASS" : "FAIL"));
+        } catch (Exception e) {
+            logger.error("Failed to run scenario: " + scenario.getName() + " - " + e.getMessage());
+            report.logError("Failed to run scenario: " + scenario.getName() + " - " + e.getMessage());
+            
+            // End scenario reporting with failure
+            report.endTest(createTestResult(scenario.getName(), false));
+        }
+    }
+    
+    /**
+     * Find step definition classes
+     * @param packages the packages to scan
+     * @return a list of step definition classes
+     */
+    private List<Class<?>> findStepDefinitionClasses(List<String> packages) {
+        logger.debug("Finding step definition classes in packages: " + String.join(", ", packages));
+        
+        List<Class<?>> stepDefClasses = new ArrayList<>();
+        
+        // TODO: Implement package scanning
+        // This would require a library like Reflections or custom ClassLoader logic
+        // For the purposes of this implementation, return a placeholder
+        
+        return stepDefClasses;
+    }
+    
+    /**
+     * Create a TestNG test result
+     * @param testName the test name
+     * @param success whether the test was successful
+     * @return a test result
+     */
+    private org.testng.ITestResult createTestResult(String testName, boolean success) {
+        // TODO: Implement TestNG result creation
+        // This would require using TestNG internal classes
+        // For now, return null as a placeholder
+        return null;
+    }
+    
+    /**
+     * Run a TestNG XML file with BDD features
+     * @param xmlFile the XML file
+     */
+    public void runTestNGXml(File xmlFile) {
+        logger.info("Running TestNG XML file: " + xmlFile.getName());
+        
+        try {
+            TestNG testng = new TestNG();
+            testng.setTestSuites(Arrays.asList(xmlFile.getAbsolutePath()));
+            testng.run();
+            
+            logger.info("Finished running TestNG XML file: " + xmlFile.getName());
+        } catch (Exception e) {
+            logger.error("Failed to run TestNG XML file: " + xmlFile.getName() + " - " + e.getMessage());
+            throw new CSSmartBDDException("Failed to run TestNG XML file: " + xmlFile.getName(), e);
+        }
+    }
+    
+    /**
+     * Create a TestNG XML file for BDD features
+     * @param featureFiles the feature files
+     * @param stepDefinitionPackages the packages containing step definitions
+     * @param outputFile the output file
+     */
+    public void createTestNGXml(List<File> featureFiles, List<String> stepDefinitionPackages, File outputFile) {
+        logger.info("Creating TestNG XML file for " + featureFiles.size() + " feature files");
+        
+        try {
+            XmlSuite suite = new XmlSuite();
+            suite.setName("CSSmartBDD Suite");
+            
+            XmlTest test = new XmlTest(suite);
+            test.setName("CSSmartBDD Tests");
+            
+            // Add CSSmartBDDRunner class
+            XmlClass runnerClass = new XmlClass(CSSmartCodelessRunner.class.getName());
+            test.getXmlClasses().add(runnerClass);
+            
+            // Add feature files as parameters
+            suite.setParameters(createXmlParameters(featureFiles, stepDefinitionPackages));
+            
+            // Write XML file
+            org.testng.xml.XmlSuiteUtils.writeFile(suite, outputFile);
+            
+            logger.info("Created TestNG XML file: " + outputFile.getAbsolutePath());
+        } catch (Exception e) {
+            logger.error("Failed to create TestNG XML file: " + e.getMessage());
+            throw new CSSmartBDDException("Failed to create TestNG XML file", e);
+        }
+    }
+    
+    /**
+     * Create XML parameters
+     * @param featureFiles the feature files
+     * @param stepDefinitionPackages the packages containing step definitions
+     * @return a map of parameters
+     */
+    private Map<String, String> createXmlParameters(List<File> featureFiles, List<String> stepDefinitionPackages) {
+        Map<String, String> params = new HashMap<>();
+        
+        // Add feature files
+        String featureFilePaths = featureFiles.stream()
+            .map(File::getAbsolutePath)
+            .collect(Collectors.joining(","));
+        params.put("featureFiles", featureFilePaths);
+        
+        // Add step definition packages
+        String packageNames = String.join(",", stepDefinitionPackages);
+        params.put("stepDefinitionPackages", packageNames);
+        
+        return params;
+    }
+}
+
+
+/**
+ * CSSmartAPIClient.java
+ * Enhanced HTTP client wrapper
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class CSSmartAPIClient {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private static final ThreadLocal<HttpClient> threadLocalClient = ThreadLocal.withInitial(() -> 
+        HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build()
+    );
+    
+    private static final Map<String, CSSmartAPIClient> instances = new ConcurrentHashMap<>();
+    
+    private final String baseUrl;
+    private final CSSmartAPIAuth auth;
+    private final HttpClient httpClient;
+    
+    /**
+     * Private constructor
+     * @param baseUrl the base URL
+     * @param auth the authentication
+     */
+    private CSSmartAPIClient(String baseUrl, CSSmartAPIAuth auth) {
+        this.baseUrl = normalizeBaseUrl(baseUrl);
+        this.auth = auth;
+        this.httpClient = threadLocalClient.get();
+        
+        logger.info("Created API client for: " + baseUrl);
+    }
+    
+    /**
+     * Get an instance
+     * @param baseUrl the base URL
+     * @return the client instance
+     */
+    public static CSSmartAPIClient getInstance(String baseUrl) {
+        return getInstance(baseUrl, null);
+    }
+    
+    /**
+     * Get an instance with authentication
+     * @param baseUrl the base URL
+     * @param auth the authentication
+     * @return the client instance
+     */
+    public static CSSmartAPIClient getInstance(String baseUrl, CSSmartAPIAuth auth) {
+        String key = baseUrl + (auth != null ? "-" + auth.getType() : "");
+        return instances.computeIfAbsent(key, k -> new CSSmartAPIClient(baseUrl, auth));
+    }
+    
+    /**
+     * Create a request
+     * @return a request builder
+     */
+    public CSSmartAPIRequest createRequest() {
+        return new CSSmartAPIRequest(this);
+    }
+    
+    /**
+     * Execute a request
+     * @param request the request
+     * @return the response
+     */
+    public CSSmartAPIResponse execute(CSSmartAPIRequest request) {
+        try {
+            String url = buildUrl(request.getEndpoint());
+            logger.info("Executing " + request.getMethod() + " request to: " + url);
+            report.logInfo("Executing " + request.getMethod() + " request to: " + url);
+            
+            // Build HttpRequest
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .method(request.getMethod(), request.getBodyPublisher());
+            
+            // Add headers
+            request.getHeaders().forEach(requestBuilder::header);
+            
+            // Add authentication
+            if (auth != null) {
+                auth.applyTo(requestBuilder);
+            }
+            
+            // Add timeout
+            requestBuilder.timeout(Duration.ofSeconds(request.getTimeoutSeconds()));
+            
+            // Build and send request
+            HttpRequest httpRequest = requestBuilder.build();
+            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            
+            // Create response
+            CSSmartAPIResponse response = new CSSmartAPIResponse(httpResponse);
+            
+            // Log response
+            logger.info("Received response: " + response.getStatusCode());
+            report.logInfo("Received response: " + response.getStatusCode() + " - " + response.getStatusMessage());
+            
+            return response;
+        } catch (IOException | InterruptedException e) {
+            logger.error("Request execution failed: " + e.getMessage());
+            report.logError("Request execution failed: " + e.getMessage());
+            throw new CSSmartAPIException("Request execution failed", e);
+        }
+    }
+    
+    /**
+     * Execute a request asynchronously
+     * @param request the request
+     * @return a CompletableFuture of the response
+     */
+    public CompletableFuture<CSSmartAPIResponse> executeAsync(CSSmartAPIRequest request) {
+        try {
+            String url = buildUrl(request.getEndpoint());
+            logger.info("Executing async " + request.getMethod() + " request to: " + url);
+            report.logInfo("Executing async " + request.getMethod() + " request to: " + url);
+            
+            // Build HttpRequest
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .method(request.getMethod(), request.getBodyPublisher());
+            
+            // Add headers
+            request.getHeaders().forEach(requestBuilder::header);
+            
+            // Add authentication
+            if (auth != null) {
+                auth.applyTo(requestBuilder);
+            }
+            
+            // Add timeout
+            requestBuilder.timeout(Duration.ofSeconds(request.getTimeoutSeconds()));
+            
+            // Build and send request asynchronously
+            HttpRequest httpRequest = requestBuilder.build();
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofByteArray())
+                .thenApply(CSSmartAPIResponse::new)
+                .whenComplete((response, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Async request failed: " + throwable.getMessage());
+                        report.logError("Async request failed: " + throwable.getMessage());
+                    } else {
+                        logger.info("Received async response: " + response.getStatusCode());
+                        report.logInfo("Received async response: " + response.getStatusCode() + " - " + response.getStatusMessage());
+                    }
+                });
+        } catch (Exception e) {
+            logger.error("Async request execution failed: " + e.getMessage());
+            report.logError("Async request execution failed: " + e.getMessage());
+            CompletableFuture<CSSmartAPIResponse> future = new CompletableFuture<>();
+            future.completeExceptionally(new CSSmartAPIException("Async request execution failed", e));
+            return future;
+        }
+    }
+    
+    /**
+     * Build a URL
+     * @param endpoint the endpoint
+     * @return the full URL
+     */
+    private String buildUrl(String endpoint) {
+        if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+            return endpoint;
+        }
+        
+        if (endpoint.startsWith("/")) {
+            return baseUrl + endpoint.substring(1);
+        } else {
+            return baseUrl + endpoint;
+        }
+    }
+    
+    /**
+     * Normalize a base URL
+     * @param url the URL
+     * @return the normalized URL
+     */
+    private String normalizeBaseUrl(String url) {
+        if (!url.endsWith("/")) {
+            return url + "/";
+        }
+        return url;
+    }
+    
+    /**
+     * Get the base URL
+     * @return the base URL
+     */
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+    
+    /**
+     * Get the authentication
+     * @return the authentication
+     */
+    public CSSmartAPIAuth getAuth() {
+        return auth;
+    }
+}
+
+/**
+ * CSSmartAPIRequest.java
+ * Fluent request building
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.net.URLEncoder;
+import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+public class CSSmartAPIRequest {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    
+    private final CSSmartAPIClient client;
+    private String method = "GET";
+    private String endpoint;
+    private final Map<String, String> headers = new HashMap<>();
+    private final Map<String, String> queryParams = new HashMap<>();
+    private HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.noBody();
+    private Object body;
+    private long timeoutSeconds = 30;
+    
+    /**
+     * Constructor
+     * @param client the API client
+     */
+    CSSmartAPIRequest(CSSmartAPIClient client) {
+        this.client = client;
+        
+        // Add default headers
+        headers.put("Accept", "application/json");
+        headers.put("User-Agent", "CSSmartFramework-APIClient");
+    }
+    
+    /**
+     * Set the request method
+     * @param method the HTTP method
+     * @return this request
+     */
+    public CSSmartAPIRequest method(String method) {
+        this.method = method.toUpperCase();
+        return this;
+    }
+    
+    /**
+     * Set GET method
+     * @return this request
+     */
+    public CSSmartAPIRequest get() {
+        return method("GET");
+    }
+    
+    /**
+     * Set POST method
+     * @return this request
+     */
+    public CSSmartAPIRequest post() {
+        return method("POST");
+    }
+    
+    /**
+     * Set PUT method
+     * @return this request
+     */
+    public CSSmartAPIRequest put() {
+        return method("PUT");
+    }
+    
+    /**
+     * Set DELETE method
+     * @return this request
+     */
+    public CSSmartAPIRequest delete() {
+        return method("DELETE");
+    }
+    
+    /**
+     * Set PATCH method
+     * @return this request
+     */
+    public CSSmartAPIRequest patch() {
+        return method("PATCH");
+    }
+    
+    /**
+     * Set the endpoint
+     * @param endpoint the endpoint
+     * @return this request
+     */
+    public CSSmartAPIRequest endpoint(String endpoint) {
+        this.endpoint = endpoint;
+        return this;
+    }
+    
+    /**
+     * Add a header
+     * @param name the header name
+     * @param value the header value
+     * @return this request
+     */
+    public CSSmartAPIRequest header(String name, String value) {
+        headers.put(name, value);
+        return this;
+    }
+    
+    /**
+     * Add headers
+     * @param headers the headers
+     * @return this request
+     */
+    public CSSmartAPIRequest headers(Map<String, String> headers) {
+        this.headers.putAll(headers);
+        return this;
+    }
+    
+    /**
+     * Add a query parameter
+     * @param name the parameter name
+     * @param value the parameter value
+     * @return this request
+     */
+    public CSSmartAPIRequest queryParam(String name, String value) {
+        queryParams.put(name, value);
+        return this;
+    }
+    
+    /**
+     * Add query parameters
+     * @param params the parameters
+     * @return this request
+     */
+    public CSSmartAPIRequest queryParams(Map<String, String> params) {
+        this.queryParams.putAll(params);
+        return this;
+    }
+    
+    /**
+     * Set the body as a JSON object
+     * @param body the body object
+     * @return this request
+     */
+    public CSSmartAPIRequest body(Object body) {
+        try {
+            this.body = body;
+            String json = JSON_MAPPER.writeValueAsString(body);
+            this.bodyPublisher = HttpRequest.BodyPublishers.ofString(json);
+            headers.put("Content-Type", "application/json");
+            return this;
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to serialize request body to JSON", e);
+        }
+    }
+    
+    /**
+     * Set the body as a JSON string
+     * @param json the JSON string
+     * @return this request
+     */
+    public CSSmartAPIRequest bodyJson(String json) {
+        this.body = json;
+        this.bodyPublisher = HttpRequest.BodyPublishers.ofString(json);
+        headers.put("Content-Type", "application/json");
+        return this;
+    }
+    
+    /**
+     * Set the body as form data
+     * @param formData the form data
+     * @return this request
+     */
+    public CSSmartAPIRequest formData(Map<String, String> formData) {
+        try {
+            this.body = formData;
+            StringBuilder builder = new StringBuilder();
+            for (Map.Entry<String, String> entry : formData.entrySet()) {
+                if (builder.length() > 0) {
+                    builder.append("&");
+                }
+                builder.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
+                builder.append("=");
+                builder.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
+            }
+            this.bodyPublisher = HttpRequest.BodyPublishers.ofString(builder.toString());
+            headers.put("Content-Type", "application/x-www-form-urlencoded");
+            return this;
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to encode form data", e);
+        }
+    }
+    
+    /**
+     * Set the body as a file
+     * @param filePath the file path
+     * @return this request
+     */
+    public CSSmartAPIRequest bodyFile(String filePath) {
+        try {
+            this.body = filePath;
+            Path path = Path.of(filePath);
+            this.bodyPublisher = HttpRequest.BodyPublishers.ofFile(path);
+            
+            // Try to determine content type from file extension
+            String contentType = Files.probeContentType(path);
+            if (contentType != null) {
+                headers.put("Content-Type", contentType);
+            }
+            
+            return this;
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to read file: " + filePath, e);
+        }
+    }
+    
+    /**
+     * Set the timeout
+     * @param seconds the timeout in seconds
+     * @return this request
+     */
+    public CSSmartAPIRequest timeout(long seconds) {
+        this.timeoutSeconds = seconds;
+        return this;
+    }
+    
+    /**
+     * Execute the request
+     * @return the response
+     */
+    public CSSmartAPIResponse execute() {
+        validateRequest();
+        return client.execute(this);
+    }
+    
+    /**
+     * Execute the request asynchronously
+     * @return a CompletableFuture of the response
+     */
+    public java.util.concurrent.CompletableFuture<CSSmartAPIResponse> executeAsync() {
+        validateRequest();
+        return client.executeAsync(this);
+    }
+    
+    /**
+     * Validate the request
+     */
+    private void validateRequest() {
+        if (endpoint == null || endpoint.isEmpty()) {
+            throw new CSSmartAPIException("Endpoint is required");
+        }
+        
+        // Add query parameters to endpoint
+        if (!queryParams.isEmpty()) {
+            StringBuilder urlBuilder = new StringBuilder(endpoint);
+            if (!endpoint.contains("?")) {
+                urlBuilder.append("?");
+            } else if (!endpoint.endsWith("&") && !endpoint.endsWith("?")) {
+                urlBuilder.append("&");
+            }
+            
+            int i = 0;
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                if (i > 0) {
+                    urlBuilder.append("&");
+                }
+                urlBuilder.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
+                urlBuilder.append("=");
+                urlBuilder.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
+                i++;
+            }
+            
+            endpoint = urlBuilder.toString();
+        }
+    }
+    
+    /**
+     * Get the method
+     * @return the method
+     */
+    String getMethod() {
+        return method;
+    }
+    
+    /**
+     * Get the endpoint
+     * @return the endpoint
+     */
+    String getEndpoint() {
+        return endpoint;
+    }
+    
+    /**
+     * Get the headers
+     * @return the headers
+     */
+    Map<String, String> getHeaders() {
+        return headers;
+    }
+    
+    /**
+     * Get the body publisher
+     * @return the body publisher
+     */
+    HttpRequest.BodyPublisher getBodyPublisher() {
+        return bodyPublisher;
+    }
+    
+    /**
+     * Get the body
+     * @return the body
+     */
+    Object getBody() {
+        return body;
+    }
+    
+    /**
+     * Get the timeout
+     * @return the timeout in seconds
+     */
+    long getTimeoutSeconds() {
+        return timeoutSeconds;
+    }
+}
+
+/**
+ * CSSmartAPIResponse.java
+ * Rich response handling
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.net.http.HttpResponse;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public class CSSmartAPIResponse {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    
+    private final int statusCode;
+    private final String statusMessage;
+    private final Map<String, String> headers;
+    private final byte[] body;
+    
+    /**
+     * Constructor
+     * @param httpResponse the HTTP response
+     */
+    CSSmartAPIResponse(HttpResponse<byte[]> httpResponse) {
+        this.statusCode = httpResponse.statusCode();
+        this.statusMessage = httpResponse.toString();
+        this.headers = httpResponse.headers().map().entrySet().stream()
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> String.join(", ", entry.getValue())
+            ));
+        this.body = httpResponse.body();
+        
+        logger.debug("Response status: " + statusCode);
+    }
+    
+    /**
+     * Get the status code
+     * @return the status code
+     */
+    public int getStatusCode() {
+        return statusCode;
+    }
+    
+    /**
+     * Get the status message
+     * @return the status message
+     */
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+    
+    /**
+     * Get the headers
+     * @return the headers
+     */
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+    
+    /**
+     * Get a header
+     * @param name the header name
+     * @return the header value
+     */
+    public String getHeader(String name) {
+        return headers.get(name);
+    }
+    
+    /**
+     * Get the content type
+     * @return the content type
+     */
+    public String getContentType() {
+        return headers.getOrDefault("Content-Type", "").split(";")[0];
+    }
+    
+    /**
+     * Get the body as a string
+     * @return the body
+     */
+    public String getBodyAsString() {
+        return new String(body);
+    }
+    
+    /**
+     * Get the body as a byte array
+     * @return the body
+     */
+    public byte[] getBodyAsBytes() {
+        return body;
+    }
+    
+    /**
+     * Get the body as a JSON node
+     * @return the JSON node
+     */
+    public JsonNode getBodyAsJson() {
+        try {
+            return JSON_MAPPER.readTree(body);
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to parse response body as JSON", e);
+        }
+    }
+    
+    /**
+     * Get the body as an object
+     * @param <T> the type
+     * @param clazz the class
+     * @return the object
+     */
+    public <T> T getBodyAs(Class<T> clazz) {
+        try {
+            return JSON_MAPPER.readValue(body, clazz);
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to deserialize response body to " + clazz.getName(), e);
+        }
+    }
+    
+    /**
+     * Check if the response is successful
+     * @return true if the status code is 2xx
+     */
+    public boolean isSuccess() {
+        return statusCode >= 200 && statusCode < 300;
+    }
+    
+    /**
+     * Check if the response is an error
+     * @return true if the status code is 4xx or 5xx
+     */
+    public boolean isError() {
+        return statusCode >= 400;
+    }
+    
+    /**
+     * Check if the response has a JSON body
+     * @return true if the content type is application/json
+     */
+    public boolean isJson() {
+        return getContentType().contains("application/json");
+    }
+    
+    /**
+     * Extract a value from a JSON response using a JSON path
+     * @param jsonPath the JSON path
+     * @return the value as a string
+     */
+    public String jsonPath(String jsonPath) {
+        try {
+            JsonNode json = getBodyAsJson();
+            String[] parts = jsonPath.split("\\.");
+            
+            JsonNode node = json;
+            for (String part : parts) {
+                if (part.contains("[")) {
+                    // Handle array index
+                    String arrayName = part.substring(0, part.indexOf("["));
+                    int index = Integer.parseInt(part.substring(part.indexOf("[") + 1, part.indexOf("]")));
+                    node = node.get(arrayName).get(index);
+                } else {
+                    node = node.get(part);
+                }
+                
+                if (node == null) {
+                    return null;
+                }
+            }
+            
+            return node.isValueNode() ? node.asText() : node.toString();
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Failed to extract JSON path: " + jsonPath, e);
+        }
+    }
+    
+    /**
+     * Assert that the status code is as expected
+     * @param expectedStatusCode the expected status code
+     * @return this response
+     */
+    public CSSmartAPIResponse assertStatusCode(int expectedStatusCode) {
+        if (statusCode != expectedStatusCode) {
+            throw new CSSmartAPIException("Expected status code " + expectedStatusCode + 
+                " but got " + statusCode, statusCode);
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that the response is successful
+     * @return this response
+     */
+    public CSSmartAPIResponse assertSuccess() {
+        if (!isSuccess()) {
+            throw new CSSmartAPIException("Expected a successful response but got status code " + 
+                statusCode, statusCode);
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that a header exists
+     * @param headerName the header name
+     * @return this response
+     */
+    public CSSmartAPIResponse assertHeaderExists(String headerName) {
+        if (!headers.containsKey(headerName)) {
+            throw new CSSmartAPIException("Expected header '" + headerName + "' but it was not found");
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that a header has a specific value
+     * @param headerName the header name
+     * @param expectedValue the expected value
+     * @return this response
+     */
+    public CSSmartAPIResponse assertHeader(String headerName, String expectedValue) {
+        String value = headers.get(headerName);
+        if (value == null || !value.equals(expectedValue)) {
+            throw new CSSmartAPIException("Expected header '" + headerName + "' to be '" + 
+                expectedValue + "' but got '" + value + "'");
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that the content type is as expected
+     * @param expectedContentType the expected content type
+     * @return this response
+     */
+    public CSSmartAPIResponse assertContentType(String expectedContentType) {
+        String contentType = getContentType();
+        if (!contentType.equalsIgnoreCase(expectedContentType)) {
+            throw new CSSmartAPIException("Expected content type '" + expectedContentType + 
+                "' but got '" + contentType + "'");
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that a JSON path exists
+     * @param jsonPath the JSON path
+     * @return this response
+     */
+    public CSSmartAPIResponse assertJsonPathExists(String jsonPath) {
+        String value = jsonPath(jsonPath);
+        if (value == null) {
+            throw new CSSmartAPIException("JSON path '" + jsonPath + "' not found in response");
+        }
+        return this;
+    }
+    
+    /**
+     * Assert that a JSON path has a specific value
+     * @param jsonPath the JSON path
+     * @param expectedValue the expected value
+     * @return this response
+     */
+    public CSSmartAPIResponse assertJsonPath(String jsonPath, String expectedValue) {
+        String value = jsonPath(jsonPath);
+        if (value == null || !value.equals(expectedValue)) {
+            throw new CSSmartAPIException("Expected JSON path '" + jsonPath + "' to be '" + 
+                expectedValue + "' but got '" + value + "'");
+        }
+        return this;
+    }
+    
+    /**
+     * Throw an exception if the response is an error
+     * @return this response
+     */
+    public CSSmartAPIResponse throwIfError() {
+        if (isError()) {
+            throw new CSSmartAPIException("API request failed with status code " + statusCode + 
+                ": " + getBodyAsString(), statusCode);
+        }
+        return this;
+    }
+}
+
+/**
+ * CSSmartAPIValidator.java
+ * Schema validation
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.fge.jsonschema.core.exceptions.ProcessingException;
+import com.github.fge.jsonschema.core.report.ProcessingReport;
+import com.github.fge.jsonschema.main.JsonSchema;
+import com.github.fge.jsonschema.main.JsonSchemaFactory;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+
+public class CSSmartAPIValidator {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory.byDefault();
+    private static final Map<String, JsonSchema> schemaCache = new HashMap<>();
+    
+    /**
+     * Validate a response against a JSON schema
+     * @param response the response
+     * @param schemaPath the path to the schema file
+     * @return the validation report
+     */
+    public static ValidationResult validate(CSSmartAPIResponse response, String schemaPath) {
+        try {
+            logger.debug("Validating response against schema: " + schemaPath);
+            
+            // Get schema
+            JsonSchema schema = getSchema(schemaPath);
+            
+            // Get response as JSON
+            JsonNode json = response.getBodyAsJson();
+            
+            // Validate
+            ProcessingReport report = schema.validate(json);
+            boolean valid = report.isSuccess();
+            
+            logger.debug("Validation result: " + (valid ? "PASS" : "FAIL"));
+            
+            return new ValidationResult(valid, report.toString());
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Schema validation failed: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Validate a JSON string against a JSON schema
+     * @param json the JSON string
+     * @param schemaPath the path to the schema file
+     * @return the validation report
+     */
+    public static ValidationResult validate(String json, String schemaPath) {
+        try {
+            logger.debug("Validating JSON against schema: " + schemaPath);
+            
+            // Get schema
+            JsonSchema schema = getSchema(schemaPath);
+            
+            // Parse JSON
+            JsonNode jsonNode = JSON_MAPPER.readTree(json);
+            
+            // Validate
+            ProcessingReport report = schema.validate(jsonNode);
+            boolean valid = report.isSuccess();
+            
+            logger.debug("Validation result: " + (valid ? "PASS" : "FAIL"));
+            
+            return new ValidationResult(valid, report.toString());
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Schema validation failed: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Validate a JSON node against a JSON schema
+     * @param json the JSON node
+     * @param schemaPath the path to the schema file
+     * @return the validation report
+     */
+    public static ValidationResult validate(JsonNode json, String schemaPath) {
+        try {
+            logger.debug("Validating JSON node against schema: " + schemaPath);
+            
+            // Get schema
+            JsonSchema schema = getSchema(schemaPath);
+            
+            // Validate
+            ProcessingReport report = schema.validate(json);
+            boolean valid = report.isSuccess();
+            
+            logger.debug("Validation result: " + (valid ? "PASS" : "FAIL"));
+            
+            return new ValidationResult(valid, report.toString());
+        } catch (Exception e) {
+            throw new CSSmartAPIException("Schema validation failed: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Get a schema by path
+     * @param schemaPath the path to the schema file
+     * @return the schema
+     */
+    private static JsonSchema getSchema(String schemaPath) throws IOException, ProcessingException {
+        // Check cache
+        if (schemaCache.containsKey(schemaPath)) {
+            return schemaCache.get(schemaPath);
+        }
+        
+        // Read schema file
+        String schemaContent = new String(Files.readAllBytes(Paths.get(schemaPath)));
+        
+        // Parse schema
+        JsonNode schemaNode = JSON_MAPPER.readTree(schemaContent);
+        JsonSchema schema = SCHEMA_FACTORY.getJsonSchema(schemaNode);
+        
+        // Cache schema
+        schemaCache.put(schemaPath, schema);
+        
+        return schema;
+    }
+    
+    /**
+     * Validation result class
+     */
+    public static class ValidationResult {
+        private final boolean valid;
+        private final String report;
+        
+        /**
+         * Constructor
+         * @param valid whether the validation passed
+         * @param report the validation report
+         */
+        public ValidationResult(boolean valid, String report) {
+            this.valid = valid;
+            this.report = report;
+        }
+        
+        /**
+         * Check if the validation passed
+         * @return true if the validation passed
+         */
+        public boolean isValid() {
+            return valid;
+        }
+        
+        /**
+         * Get the validation report
+         * @return the report
+         */
+        public String getReport() {
+            return report;
+        }
+        
+        /**
+         * Assert that the validation passed
+         */
+        public void assertValid() {
+            if (!valid) {
+                throw new CSSmartAPIException("JSON schema validation failed: " + report);
+            }
+        }
+    }
+}
+
+/**
+ * CSSmartAPIAssertion.java
+ * Specialized API assertions
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+public class CSSmartAPIAssertion {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    
+    /**
+     * Assert that a response has a specific status code
+     * @param response the response
+     * @param expectedStatusCode the expected status code
+     */
+    public static void assertStatusCode(CSSmartAPIResponse response, int expectedStatusCode) {
+        int actualStatusCode = response.getStatusCode();
+        if (actualStatusCode != expectedStatusCode) {
+            String message = "Expected status code " + expectedStatusCode + " but got " + actualStatusCode;
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message, actualStatusCode);
+        }
+        
+        logger.info("Status code assertion passed: " + expectedStatusCode);
+        report.logInfo("Status code assertion passed: " + expectedStatusCode);
+    }
+    
+    /**
+     * Assert that a response is successful (2xx)
+     * @param response the response
+     */
+    public static void assertSuccess(CSSmartAPIResponse response) {
+        if (!response.isSuccess()) {
+            String message = "Expected successful response but got status code " + response.getStatusCode();
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message, response.getStatusCode());
+        }
+        
+        logger.info("Success assertion passed: " + response.getStatusCode());
+        report.logInfo("Success assertion passed: " + response.getStatusCode());
+    }
+    
+    /**
+     * Assert that a response has a header
+     * @param response the response
+     * @param headerName the header name
+     */
+    public static void assertHeaderExists(CSSmartAPIResponse response, String headerName) {
+        if (!response.getHeaders().containsKey(headerName)) {
+            String message = "Expected header '" + headerName + "' but it was not found";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Header existence assertion passed: " + headerName);
+        report.logInfo("Header existence assertion passed: " + headerName);
+    }
+    
+    /**
+     * Assert that a response has a header with a specific value
+     * @param response the response
+     * @param headerName the header name
+     * @param expectedValue the expected value
+     */
+    public static void assertHeaderValue(CSSmartAPIResponse response, String headerName, String expectedValue) {
+        String actualValue = response.getHeader(headerName);
+        if (actualValue == null || !actualValue.equals(expectedValue)) {
+            String message = "Expected header '" + headerName + "' to be '" + expectedValue + "' but got '" + actualValue + "'";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Header value assertion passed: " + headerName + " = " + expectedValue);
+        report.logInfo("Header value assertion passed: " + headerName + " = " + expectedValue);
+    }
+    
+    /**
+     * Assert that a response has a specific content type
+     * @param response the response
+     * @param expectedContentType the expected content type
+     */
+    public static void assertContentType(CSSmartAPIResponse response, String expectedContentType) {
+        String actualContentType = response.getContentType();
+        if (!actualContentType.equalsIgnoreCase(expectedContentType)) {
+            String message = "Expected content type '" + expectedContentType + "' but got '" + actualContentType + "'";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Content type assertion passed: " + expectedContentType);
+        report.logInfo("Content type assertion passed: " + expectedContentType);
+    }
+    
+    /**
+     * Assert that a response body contains a text
+     * @param response the response
+     * @param expectedText the expected text
+     */
+    public static void assertBodyContains(CSSmartAPIResponse response, String expectedText) {
+        String body = response.getBodyAsString();
+        if (!body.contains(expectedText)) {
+            String message = "Expected response body to contain '" + expectedText + "' but it doesn't";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Body contains assertion passed: " + expectedText);
+        report.logInfo("Body contains assertion passed: '" + expectedText + "' found in response");
+    }
+    
+    /**
+     * Assert that a response body matches a regex
+     * @param response the response
+     * @param regex the regex
+     */
+    public static void assertBodyMatches(CSSmartAPIResponse response, String regex) {
+        String body = response.getBodyAsString();
+        if (!Pattern.compile(regex, Pattern.DOTALL).matcher(body).matches()) {
+            String message = "Expected response body to match regex '" + regex + "' but it doesn't";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Body matches assertion passed: " + regex);
+        report.logInfo("Body matches assertion passed: response matches regex pattern");
+    }
+    
+    /**
+     * Assert that a JSON path exists in the response
+     * @param response the response
+     * @param jsonPath the JSON path
+     */
+    public static void assertJsonPathExists(CSSmartAPIResponse response, String jsonPath) {
+        String value = response.jsonPath(jsonPath);
+        if (value == null) {
+            String message = "JSON path '" + jsonPath + "' not found in response";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("JSON path existence assertion passed: " + jsonPath);
+        report.logInfo("JSON path existence assertion passed: " + jsonPath);
+    }
+    
+    /**
+     * Assert that a JSON path has a specific value
+     * @param response the response
+     * @param jsonPath the JSON path
+     * @param expectedValue the expected value
+     */
+    public static void assertJsonPathValue(CSSmartAPIResponse response, String jsonPath, String expectedValue) {
+        String actualValue = response.jsonPath(jsonPath);
+        if (actualValue == null || !actualValue.equals(expectedValue)) {
+            String message = "Expected JSON path '" + jsonPath + "' to be '" + expectedValue + "' but got '" + actualValue + "'";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("JSON path value assertion passed: " + jsonPath + " = " + expectedValue);
+        report.logInfo("JSON path value assertion passed: " + jsonPath + " = " + expectedValue);
+    }
+    
+    /**
+     * Assert that a response passes JSON schema validation
+     * @param response the response
+     * @param schemaPath the path to the schema file
+     */
+    public static void assertJsonSchema(CSSmartAPIResponse response, String schemaPath) {
+        CSSmartAPIValidator.ValidationResult result = CSSmartAPIValidator.validate(response, schemaPath);
+        if (!result.isValid()) {
+            String message = "JSON schema validation failed: " + result.getReport();
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("JSON schema validation passed: " + schemaPath);
+        report.logInfo("JSON schema validation passed: " + schemaPath);
+    }
+    
+    /**
+     * Assert that a JSON array has a specific size
+     * @param response the response
+     * @param jsonPath the JSON path to the array
+     * @param expectedSize the expected size
+     */
+    public static void assertJsonArraySize(CSSmartAPIResponse response, String jsonPath, int expectedSize) {
+        JsonNode node = response.getBodyAsJson().at(jsonPath);
+        if (!node.isArray()) {
+            String message = "JSON path '" + jsonPath + "' is not an array";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        int actualSize = node.size();
+        if (actualSize != expectedSize) {
+            String message = "Expected JSON array at '" + jsonPath + "' to have size " + expectedSize + " but got " + actualSize;
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("JSON array size assertion passed: " + jsonPath + " size = " + expectedSize);
+        report.logInfo("JSON array size assertion passed: " + jsonPath + " size = " + expectedSize);
+    }
+    
+    /**
+     * Assert that a response has all required fields
+     * @param response the response
+     * @param requiredFields the required fields (JSON paths)
+     */
+    public static void assertRequiredFields(CSSmartAPIResponse response, String... requiredFields) {
+        Set<String> missing = new HashSet<>();
+        for (String field : requiredFields) {
+            String value = response.jsonPath(field);
+            if (value == null) {
+                missing.add(field);
+            }
+        }
+        
+        if (!missing.isEmpty()) {
+            String message = "Missing required fields: " + Arrays.toString(missing.toArray());
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Required fields assertion passed: all " + requiredFields.length + " fields present");
+        report.logInfo("Required fields assertion passed: all required fields present");
+    }
+    
+    /**
+     * Assert that a response time is below a threshold
+     * @param startTime the start time in milliseconds
+     * @param endTime the end time in milliseconds
+     * @param maxTimeMs the maximum allowed time in milliseconds
+     */
+    public static void assertResponseTime(long startTime, long endTime, long maxTimeMs) {
+        long responseTime = endTime - startTime;
+        if (responseTime > maxTimeMs) {
+            String message = "Response time exceeded threshold: " + responseTime + "ms > " + maxTimeMs + "ms";
+            logger.error(message);
+            report.logError(message);
+            throw new CSSmartAPIException(message);
+        }
+        
+        logger.info("Response time assertion passed: " + responseTime + "ms < " + maxTimeMs + "ms");
+        report.logInfo("Response time assertion passed: " + responseTime + "ms");
+    }
+}
+
+/**
+ * CSSmartAPIAuth.java
+ * Authentication support
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.cert.X509Certificate;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+
+public abstract class CSSmartAPIAuth {
+    protected static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    
+    /**
+     * Apply authentication to a request
+     * @param requestBuilder the request builder
+     */
+    public abstract void applyTo(HttpRequest.Builder requestBuilder);
+    
+    /**
+     * Get the authentication type
+     * @return the type
+     */
+    public abstract String getType();
+    
+    /**
+     * Create a basic authentication
+     * @param username the username
+     * @param password the password
+     * @return the authentication
+     */
+    public static CSSmartAPIAuth basic(String username, String password) {
+        return new BasicAuth(username, password);
+    }
+    
+    /**
+     * Create a bearer token authentication
+     * @param token the token
+     * @return the authentication
+     */
+    public static CSSmartAPIAuth bearer(String token) {
+        return new BearerAuth(token);
+    }
+    
+    /**
+     * Create a custom header authentication
+     * @param headerName the header name
+     * @param headerValue the header value
+     * @return the authentication
+     */
+    public static CSSmartAPIAuth header(String headerName, String headerValue) {
+        return new HeaderAuth(headerName, headerValue);
+    }
+    
+    /**
+     * Create a certificate authentication
+     * @param keystorePath the keystore path
+     * @param keystorePassword the keystore password
+     * @param keyPassword the key password
+     * @return the authentication
+     */
+    public static CSSmartAPIAuth certificate(String keystorePath, String keystorePassword, String keyPassword) {
+        return new CertificateAuth(keystorePath, keystorePassword, keyPassword);
+    }
+    
+    /**
+     * Create an OAuth 2.0 authentication
+     * @param tokenUrl the token URL
+     * @param clientId the client ID
+     * @param clientSecret the client secret
+     * @param scope the scope
+     * @return the authentication
+     */
+    public static CSSmartAPIAuth oauth2(String tokenUrl, String clientId, String clientSecret, String scope) {
+        return new OAuth2Auth(tokenUrl, clientId, clientSecret, scope);
+    }
+    
+    /**
+     * Basic authentication
+     */
+    private static class BasicAuth extends CSSmartAPIAuth {
+        private final String username;
+        private final String password;
+        
+        /**
+         * Constructor
+         * @param username the username
+         * @param password the password
+         */
+        public BasicAuth(String username, String password) {
+            this.username = username;
+            this.password = password;
+            logger.debug("Created Basic authentication for user: " + username);
+        }
+        
+        @Override
+        public void applyTo(HttpRequest.Builder requestBuilder) {
+            String credentials = username + ":" + password;
+            String encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+            requestBuilder.header("Authorization", "Basic " + encodedCredentials);
+        }
+        
+        @Override
+        public String getType() {
+            return "Basic";
+        }
+    }
+    
+    /**
+     * Bearer token authentication
+     */
+    private static class BearerAuth extends CSSmartAPIAuth {
+        private final String token;
+        
+        /**
+         * Constructor
+         * @param token the token
+         */
+        public BearerAuth(String token) {
+            this.token = token;
+            logger.debug("Created Bearer token authentication");
+        }
+        
+        @Override
+        public void applyTo(HttpRequest.Builder requestBuilder) {
+            requestBuilder.header("Authorization", "Bearer " + token);
+        }
+        
+        @Override
+        public String getType() {
+            return "Bearer";
+        }
+    }
+    
+    /**
+     * Custom header authentication
+     */
+    private static class HeaderAuth extends CSSmartAPIAuth {
+        private final String headerName;
+        private final String headerValue;
+        
+        /**
+         * Constructor
+         * @param headerName the header name
+         * @param headerValue the header value
+         */
+        public HeaderAuth(String headerName, String headerValue) {
+            this.headerName = headerName;
+            this.headerValue = headerValue;
+            logger.debug("Created custom header authentication: " + headerName);
+        }
+        
+        @Override
+        public void applyTo(HttpRequest.Builder requestBuilder) {
+            requestBuilder.header(headerName, headerValue);
+        }
+        
+        @Override
+        public String getType() {
+            return "Header";
+        }
+    }
+    
+    /**
+     * Certificate authentication
+     */
+    private static class CertificateAuth extends CSSmartAPIAuth {
+        private final String keystorePath;
+        private final String keystorePassword;
+        private final String keyPassword;
+        private SSLContext sslContext;
+        
+        /**
+         * Constructor
+         * @param keystorePath the keystore path
+         * @param keystorePassword the keystore password
+         * @param keyPassword the key password
+         */
+        public CertificateAuth(String keystorePath, String keystorePassword, String keyPassword) {
+            this.keystorePath = keystorePath;
+            this.keystorePassword = keystorePassword;
+            this.keyPassword = keyPassword;
+            
+            try {
+                // Initialize SSL context
+                KeyStore keyStore = KeyStore.getInstance("JKS");
+                keyStore.load(getClass().getResourceAsStream(keystorePath), keystorePassword.toCharArray());
+                
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                kmf.init(keyStore, keyPassword.toCharArray());
+                
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(kmf.getKeyManagers(), null, null);
+                
+                logger.debug("Created certificate authentication with keystore: " + keystorePath);
+            } catch (Exception e) {
+                throw new CSSmartAPIException("Failed to initialize certificate authentication", e);
+            }
+        }
+        
+        @Override
+        public void applyTo(HttpRequest.Builder requestBuilder) {
+            // The HttpClient needs to be created with the SSL context
+            // This is currently not supported in the Java 11 HTTP client
+            // We would need to use a custom HTTP client implementation
+            throw new CSSmartAPIException("Certificate authentication is not currently supported");
+        }
+        
+        @Override
+        public String getType() {
+            return "Certificate";
+        }
+    }
+    
+    /**
+     * OAuth 2.0 authentication
+     */
+    private static class OAuth2Auth extends CSSmartAPIAuth {
+        private final String tokenUrl;
+        private final String clientId;
+        private final String clientSecret;
+        private final String scope;
+        private String accessToken;
+        private long expiresAt;
+        
+        /**
+         * Constructor
+         * @param tokenUrl the token URL
+         * @param clientId the client ID
+         * @param clientSecret the client secret
+         * @param scope the scope
+         */
+        public OAuth2Auth(String tokenUrl, String clientId, String clientSecret, String scope) {
+            this.tokenUrl = tokenUrl;
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+            this.scope = scope;
+            logger.debug("Created OAuth 2.0 authentication for client: " + clientId);
+        }
+        
+        @Override
+        public void applyTo(HttpRequest.Builder requestBuilder) {
+            // Get or refresh token
+            ensureValidToken();
+            requestBuilder.header("Authorization", "Bearer " + accessToken);
+        }
+        
+        @Override
+        public String getType() {
+            return "OAuth2";
+        }
+        
+        /**
+         * Ensure that we have a valid token
+         */
+        private void ensureValidToken() {
+            long now = System.currentTimeMillis();
+            
+            // If token is expired or not yet obtained, get a new one
+            if (accessToken == null || now >= expiresAt) {
+                obtainAccessToken();
+            }
+        }
+        
+        /**
+         * Obtain a new access token
+         */
+        private void obtainAccessToken() {
+            try {
+                logger.debug("Obtaining OAuth 2.0 access token from: " + tokenUrl);
+                
+                // Create client credentials request
+                Map<String, String> formData = new HashMap<>();
+                formData.put("grant_type", "client_credentials");
+                formData.put("client_id", clientId);
+                formData.put("client_secret", clientSecret);
+                if (scope != null && !scope.isEmpty()) {
+                    formData.put("scope", scope);
+                }
+                
+                // Create and execute request
+                CSSmartAPIClient client = CSSmartAPIClient.getInstance(tokenUrl);
+                CSSmartAPIResponse response = client.createRequest()
+                    .endpoint(tokenUrl)
+                    .post()
+                    .formData(formData)
+                    .execute();
+                
+                // Extract token from response
+                if (response.isSuccess() && response.isJson()) {
+                    accessToken = response.jsonPath("access_token");
+                    String expiresIn = response.jsonPath("expires_in");
+                    
+                    if (accessToken == null) {
+                        throw new CSSmartAPIException("Access token not found in response");
+                    }
+                    
+                    // Calculate expiry time (with 60-second buffer)
+                    long expiresInSeconds = expiresIn != null ? Long.parseLong(expiresIn) - 60 : 3600 - 60;
+                    expiresAt = System.currentTimeMillis() + (expiresInSeconds * 1000);
+                    
+                    logger.debug("Obtained OAuth 2.0 access token, expires in " + expiresInSeconds + " seconds");
+                } else {
+                    throw new CSSmartAPIException("Failed to obtain access token: " + response.getBodyAsString());
+                }
+            } catch (Exception e) {
+                throw new CSSmartAPIException("Failed to obtain OAuth 2.0 access token", e);
+            }
+        }
+    }
+}
+
+/**
+ * CSSmartAPIChaining.java
+ * Request chaining capability
+ */
+package com.cssmart.api;
+
+import com.cssmart.exceptions.CSSmartAPIException;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class CSSmartAPIChaining {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
+    
+    private final Map<String, Object> variables = new HashMap<>();
+    private final CSSmartAPIClient client;
+    private CSSmartAPIResponse lastResponse;
+    
+    /**
+     * Constructor
+     * @param baseUrl the base URL
+     */
+    public CSSmartAPIChaining(String baseUrl) {
+        this.client = CSSmartAPIClient.getInstance(baseUrl);
+        logger.info("Created API chaining for: " + baseUrl);
+    }
+    
+    /**
+     * Constructor with authentication
+     * @param baseUrl the base URL
+     * @param auth the authentication
+     */
+    public CSSmartAPIChaining(String baseUrl, CSSmartAPIAuth auth) {
+        this.client = CSSmartAPIClient.getInstance(baseUrl, auth);
+        logger.info("Created API chaining for: " + baseUrl + " with auth");
+    }
+    
+    /**
+     * Set a variable
+     * @param name the variable name
+     * @param value the variable value
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining setVariable(String name, Object value) {
+        variables.put(name, value);
+        logger.debug("Set variable: " + name + " = " + value);
+        return this;
+    }
+    
+    /**
+     * Get a variable
+     * @param name the variable name
+     * @return the variable value
+     */
+    public Object getVariable(String name) {
+        return variables.get(name);
+    }
+    
+    /**
+     * Get all variables
+     * @return the variables
+     */
+    public Map<String, Object> getVariables() {
+        return new HashMap<>(variables);
+    }
+    
+    /**
+     * Clear all variables
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining clearVariables() {
+        variables.clear();
+        logger.debug("Cleared all variables");
+        return this;
+    }
+    
+    /**
+     * Execute a request
+     * @param request the request
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining execute(CSSmartAPIRequest request) {
+        // Process variables in request
+        processRequestVariables(request);
+        
+        // Execute request
+        lastResponse = request.execute();
+        
+        logger.info("Executed request: " + request.getMethod() + " " + request.getEndpoint());
+        report.logInfo("Executed request: " + request.getMethod() + " " + request.getEndpoint());
+        
+        return this;
+    }
+    
+    /**
+     * Execute a GET request
+     * @param endpoint the endpoint
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining get(String endpoint) {
+        return execute(client.createRequest().get().endpoint(endpoint));
+    }
+    
+    /**
+     * Execute a POST request
+     * @param endpoint the endpoint
+     * @param body the request body
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining post(String endpoint, Object body) {
+        return execute(client.createRequest().post().endpoint(endpoint).body(body));
+    }
+    
+    /**
+     * Execute a PUT request
+     * @param endpoint the endpoint
+     * @param body the request body
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining put(String endpoint, Object body) {
+        return execute(client.createRequest().put().endpoint(endpoint).body(body));
+    }
+    
+    /**
+     * Execute a DELETE request
+     * @param endpoint the endpoint
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining delete(String endpoint) {
+        return execute(client.createRequest().delete().endpoint(endpoint));
+    }
+    
+    /**
+     * Execute a PATCH request
+     * @param endpoint the endpoint
+     * @param body the request body
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining patch(String endpoint, Object body) {
+        return execute(client.createRequest().patch().endpoint(endpoint).body(body));
+    }
+    
+    /**
+     * Get the last response
+     * @return the last response
+     */
+    public CSSmartAPIResponse getLastResponse() {
+        return lastResponse;
+    }
+    
+    /**
+     * Extract a value from the last response and store it as a variable
+     * @param jsonPath the JSON path
+     * @param variableName the variable name
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining extractVariable(String jsonPath, String variableName) {
+        if (lastResponse == null) {
+            throw new CSSmartAPIException("No response to extract from");
+        }
+        
+        String value = lastResponse.jsonPath(jsonPath);
+        variables.put(variableName, value);
+        
+        logger.debug("Extracted variable from response: " + variableName + " = " + value);
+        report.logInfo("Extracted variable: " + variableName + " from path: " + jsonPath);
+        
+        return this;
+    }
+    
+    /**
+     * Extract multiple values from the last response and store them as variables
+     * @param mappings the mappings of JSON paths to variable names
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining extractVariables(Map<String, String> mappings) {
+        if (lastResponse == null) {
+            throw new CSSmartAPIException("No response to extract from");
+        }
+        
+        for (Map.Entry<String, String> entry : mappings.entrySet()) {
+            String jsonPath = entry.getKey();
+            String variableName = entry.getValue();
+            
+            String value = lastResponse.jsonPath(jsonPath);
+            variables.put(variableName, value);
+            
+            logger.debug("Extracted variable from response: " + variableName + " = " + value);
+        }
+        
+        report.logInfo("Extracted " + mappings.size() + " variables from response");
+        
+        return this;
+    }
+    
+    /**
+     * Apply a transformation to a variable
+     * @param variableName the variable name
+     * @param transformer the transformation function
+     * @return this chaining instance
+     */
+    public CSSmartAPIChaining transformVariable(String variableName, Function<Object, Object> transformer) {
+        if (!variables.containsKey(variableName)) {
+            throw new CSSmartAPIException("Variable not found: " + variableName);
+        }
+        
+        Object oldValue = variables.get(variableName);
+        Object newValue = transformer.apply(oldValue);
+        variables.put(variableName, newValue);
+        
+        logger.debug("Transformed variable: " + variableName + " from " + oldValue + " to " + newValue);
+        report.logInfo("Transformed variable: " + variableName);
+        
+        return this;
+    }
+    
+    /**
+     * Process variables in a request
+     * @param request the request
+     */
+    private void processRequestVariables(CSSmartAPIRequest request) {
+        // Process endpoint
+        String endpoint = request.getEndpoint();
+        if (endpoint != null) {
+            endpoint = replaceVariables(endpoint);
+            request.endpoint(endpoint);
+        }
+        
+        // Process body
+        Object body = request.getBody();
+        if (body != null) {
+            if (body instanceof String) {
+                String bodyStr = (String) body;
+                bodyStr = replaceVariables(bodyStr);
+                request.bodyJson(bodyStr);
+            } else if (body instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> bodyMap = (Map<String, Object>) body;
+                processMapVariables(bodyMap);
+            }
+        }
+    }
+    
+    /**
+     * Replace variables in a string
+     * @param text the text
+     * @return the processed text
+     */
+    private String replaceVariables(String text) {
+        if (text == null) {
+            return null;
+        }
+        
+        Matcher matcher = VARIABLE_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        
+        while (matcher.find()) {
+            String variableName = matcher.group(1);
+            Object value = variables.get(variableName);
+            
+            if (value != null) {
+                matcher.appendReplacement(sb, value.toString());
+            } else {
+                matcher.appendReplacement(sb, matcher.group(0));
+            }
+        }
+        
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+    
+    /**
+     * Process variables in a map
+     * @param map the map
+     */
+    private void processMapVariables(Map<String, Object> map) {
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            if (value instanceof String) {
+                String strValue = (String) value;
+                map.put(key, replaceVariables(strValue));
+            } else if (value instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> nestedMap = (Map<String, Object>) value;
+                processMapVariables(nestedMap);
+            }
+        }
+    }
+    
+    /**
+     * Process variables in JSON
+     * @param json the JSON
+     * @return the processed JSON
+     */
+    private JsonNode processJsonVariables(JsonNode json) {
+        if (json.isObject()) {
+            ObjectNode objectNode = (ObjectNode) json;
+            objectNode.fields().forEachRemaining(entry -> {
+                String key = entry.getKey();
+                JsonNode value = entry.getValue();
+                
+                if (value.isTextual()) {
+                    String strValue = value.asText();
+                    String processed = replaceVariables(strValue);
+                    if (!processed.equals(strValue)) {
+                        objectNode.put(key, processed);
+                    }
+                } else if (value.isObject() || value.isArray()) {
+                    JsonNode processed = processJsonVariables(value);
+                    objectNode.set(key, processed);
+                }
+            });
+            return objectNode;
+        } else if (json.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) json;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                JsonNode value = arrayNode.get(i);
+                if (value.isTextual()) {
+                    String strValue = value.asText();
+                    String processed = replaceVariables(strValue);
+                    if (!processed.equals(strValue)) {
+                        arrayNode.set(i, JSON_MAPPER.valueToTree(processed));
+                    }
+                } else if (value.isObject() || value.isArray()) {
+                    JsonNode processed = processJsonVariables(value);
+                    arrayNode.set(i, processed);
+                }
+            }
+            return arrayNode;
+        }
+        
+        return json;
+    }
+}
+
+
+
+/**
+ * CSSmartDataProvider.java
+ * Test parameterization framework
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import org.testng.annotations.DataProvider;
+
+import java.lang.reflect.Method;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class CSSmartDataProvider {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final Map<String, DataSource> DATA_SOURCES = new ConcurrentHashMap<>();
+    
+    /**
+     * Register a data source
+     * @param name the data source name
+     * @param dataSource the data source
+     */
+    public static void registerDataSource(String name, DataSource dataSource) {
+        DATA_SOURCES.put(name, dataSource);
+        logger.info("Registered data source: " + name);
+    }
+    
+    /**
+     * Get a registered data source
+     * @param name the data source name
+     * @return the data source
+     */
+    public static DataSource getDataSource(String name) {
+        DataSource dataSource = DATA_SOURCES.get(name);
+        if (dataSource == null) {
+            throw new CSSmartException("Data source not found: " + name);
+        }
+        return dataSource;
+    }
+    
+    /**
+     * TestNG data provider
+     * @param method the test method
+     * @return the test data
+     */
+    @DataProvider(name = "CSSmartDataProvider")
+    public static Iterator<Object[]> provideData(Method method) {
+        logger.info("Providing data for method: " + method.getName());
+        
+        // Check for CSSmartDataProvider annotation
+        com.cssmart.annotations.CSSmartDataProvider annotation = 
+            method.getAnnotation(com.cssmart.annotations.CSSmartDataProvider.class);
+        
+        if (annotation == null) {
+            // Check class level annotation
+            annotation = method.getDeclaringClass().getAnnotation(
+                com.cssmart.annotations.CSSmartDataProvider.class);
+        }
+        
+        if (annotation == null) {
+            throw new CSSmartException("No CSSmartDataProvider annotation found for method: " + method.getName());
+        }
+        
+        // Get data based on annotation
+        return getDataFromAnnotation(annotation, method);
+    }
+    
+    /**
+     * Get data from annotation
+     * @param annotation the annotation
+     * @param method the test method
+     * @return the test data
+     */
+    private static Iterator<Object[]> getDataFromAnnotation(
+            com.cssmart.annotations.CSSmartDataProvider annotation, Method method) {
+        
+        String path = annotation.path();
+        String sheet = annotation.sheet();
+        String jsonPath = annotation.jsonPath();
+        String query = annotation.query();
+        
+        switch (annotation.type()) {
+            case EXCEL:
+                return CSSmartExcelReader.readExcel(path, sheet).iterator();
+            case CSV:
+                return CSSmartCSVReader.readCSV(path).iterator();
+            case JSON:
+                return CSSmartJSONReader.readJSON(path, jsonPath).iterator();
+            case DATABASE:
+                return CSSmartDBDataSource.executeQuery(query).iterator();
+            case YAML:
+                return CSSmartYAMLReader.readYAML(path).iterator();
+            default:
+                throw new CSSmartException("Unsupported data provider type: " + annotation.type());
+        }
+    }
+    
+    /**
+     * Data source interface
+     */
+    public interface DataSource {
+        /**
+         * Get the test data
+         * @return the test data
+         */
+        List<Object[]> getData();
+    }
+}
+
+/**
+ * CSSmartExcelReader.java
+ * Excel data source
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class CSSmartExcelReader implements CSSmartDataProvider.DataSource {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private final String filePath;
+    private final String sheetName;
+    
+    /**
+     * Constructor
+     * @param filePath the file path
+     * @param sheetName the sheet name
+     */
+    public CSSmartExcelReader(String filePath, String sheetName) {
+        this.filePath = filePath;
+        this.sheetName = sheetName;
+    }
+    
+    /**
+     * Read an Excel file
+     * @param filePath the file path
+     * @param sheetName the sheet name
+     * @return the test data
+     */
+    public static List<Object[]> readExcel(String filePath, String sheetName) {
+        logger.info("Reading Excel file: " + filePath + ", sheet: " + sheetName);
+        
+        try (FileInputStream fis = new FileInputStream(filePath);
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            // Get the sheet
+            Sheet sheet;
+            if (sheetName != null && !sheetName.isEmpty()) {
+                sheet = workbook.getSheet(sheetName);
+                if (sheet == null) {
+                    throw new CSSmartException("Sheet not found: " + sheetName);
+                }
+            } else {
+                sheet = workbook.getSheetAt(0);
+            }
+            
+            // Get header row
+            Row headerRow = sheet.getRow(0);
+            int columnCount = headerRow.getLastCellNum();
+            
+            List<String> headers = new ArrayList<>();
+            for (int i = 0; i < columnCount; i++) {
+                Cell cell = headerRow.getCell(i);
+                headers.add(cell != null ? cell.toString() : "Column" + i);
+            }
+            
+            // Get data rows
+            List<Object[]> data = new ArrayList<>();
+            int rowCount = sheet.getLastRowNum();
+            
+            for (int i = 1; i <= rowCount; i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) {
+                    continue;
+                }
+                
+                Map<String, Object> rowData = new HashMap<>();
+                boolean hasData = false;
+                
+                for (int j = 0; j < columnCount; j++) {
+                    Cell cell = row.getCell(j);
+                    Object value = getCellValue(cell);
+                    
+                    if (value != null) {
+                        hasData = true;
+                        rowData.put(headers.get(j), value);
+                    }
+                }
+                
+                if (hasData) {
+                    data.add(new Object[]{rowData});
+                }
+            }
+            
+            logger.info("Read " + data.size() + " rows from Excel file");
+            return data;
+        } catch (IOException e) {
+            throw new CSSmartException("Failed to read Excel file: " + filePath, e);
+        }
+    }
+    
+    /**
+     * Get a cell value
+     * @param cell the cell
+     * @return the cell value
+     */
+    private static Object getCellValue(Cell cell) {
+        if (cell == null) {
+            return null;
+        }
+        
+        CellType cellType = cell.getCellType();
+        
+        switch (cellType) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue();
+                } else {
+                    double value = cell.getNumericCellValue();
+                    // Check if it's an integer
+                    if (value == Math.floor(value)) {
+                        return (long) value;
+                    }
+                    return value;
+                }
+            case BOOLEAN:
+                return cell.getBooleanCellValue();
+            case FORMULA:
+                return cell.getCellFormula();
+            case BLANK:
+                return null;
+            default:
+                return null;
+        }
+    }
+    
+    @Override
+    public List<Object[]> getData() {
+        return readExcel(filePath, sheetName);
+    }
+}
+
+/**
+ * CSSmartCSVReader.java
+ * CSV data source
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class CSSmartCSVReader implements CSSmartDataProvider.DataSource {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private final String filePath;
+    
+    /**
+     * Constructor
+     * @param filePath the file path
+     */
+    public CSSmartCSVReader(String filePath) {
+        this.filePath = filePath;
+    }
+    
+    /**
+     * Read a CSV file
+     * @param filePath the file path
+     * @return the test data
+     */
+    public static List<Object[]> readCSV(String filePath) {
+        logger.info("Reading CSV file: " + filePath);
+        
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(filePath), StandardCharsets.UTF_8))) {
+            
+            CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader);
+            List<String> headers = parser.getHeaderNames();
+            
+            List<Object[]> data = new ArrayList<>();
+            
+            for (CSVRecord record : parser) {
+                Map<String, Object> rowData = new HashMap<>();
+                boolean hasData = false;
+                
+                for (String header : headers) {
+                    String value = record.get(header);
+                    if (value != null && !value.isEmpty()) {
+                        hasData = true;
+                        rowData.put(header, convertValue(value));
+                    }
+                }
+                
+                if (hasData) {
+                    data.add(new Object[]{rowData});
+                }
+            }
+            
+            logger.info("Read " + data.size() + " rows from CSV file");
+            return data;
+        } catch (IOException e) {
+            throw new CSSmartException("Failed to read CSV file: " + filePath, e);
+        }
+    }
+    
+    /**
+     * Convert a string value to the appropriate type
+     * @param value the string value
+     * @return the converted value
+     */
+    private static Object convertValue(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        
+        // Try to convert to numeric
+        if (value.matches("-?\\d+")) {
+            try {
+                return Long.parseLong(value);
+            } catch (NumberFormatException e) {
+                // Ignore and return as string
+            }
+        } else if (value.matches("-?\\d+\\.\\d+")) {
+            try {
+                return Double.parseDouble(value);
+            } catch (NumberFormatException e) {
+                // Ignore and return as string
+            }
+        } else if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return Boolean.parseBoolean(value);
+        }
+        
+        return value;
+    }
+    
+    @Override
+    public List<Object[]> getData() {
+        return readCSV(filePath);
+    }
+}
+
+/**
+ * CSSmartJSONReader.java
+ * JSON data source
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+public class CSSmartJSONReader implements CSSmartDataProvider.DataSource {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    
+    private final String filePath;
+    private final String jsonPath;
+    
+    /**
+     * Constructor
+     * @param filePath the file path
+     * @param jsonPath the JSON path
+     */
+    public CSSmartJSONReader(String filePath, String jsonPath) {
+        this.filePath = filePath;
+        this.jsonPath = jsonPath;
+    }
+    
+    /**
+     * Read a JSON file
+     * @param filePath the file path
+     * @param jsonPath the JSON path
+     * @return the test data
+     */
+    public static List<Object[]> readJSON(String filePath, String jsonPath) {
+        logger.info("Reading JSON file: " + filePath + ", path: " + jsonPath);
+        
+        try {
+            // Read JSON file
+            JsonNode rootNode = objectMapper.readTree(new File(filePath));
+            
+            // Navigate to the specified path
+            JsonNode dataNode = rootNode;
+            if (jsonPath != null && !jsonPath.isEmpty()) {
+                String[] pathParts = jsonPath.split("\\.");
+                for (String part : pathParts) {
+                    if (part.matches("\\[\\d+\\]")) {
+                        // Handle array index
+                        int index = Integer.parseInt(part.substring(1, part.length() - 1));
+                        dataNode = dataNode.get(index);
+                    } else {
+                        dataNode = dataNode.get(part);
+                    }
+                    
+                    if (dataNode == null) {
+                        throw new CSSmartException("JSON path not found: " + jsonPath);
+                    }
+                }
+            }
+            
+            // Convert to test data
+            List<Object[]> data = new ArrayList<>();
+            
+            if (dataNode.isArray()) {
+                // Array of objects
+                ArrayNode arrayNode = (ArrayNode) dataNode;
+                for (JsonNode item : arrayNode) {
+                    if (item.isObject()) {
+                        Map<String, Object> rowData = convertJsonNodeToMap(item);
+                        data.add(new Object[]{rowData});
+                    } else {
+                        data.add(new Object[]{convertJsonNode(item)});
+                    }
+                }
+            } else if (dataNode.isObject()) {
+                // Single object
+                Map<String, Object> rowData = convertJsonNodeToMap(dataNode);
+                data.add(new Object[]{rowData});
+            } else {
+                // Single value
+                data.add(new Object[]{convertJsonNode(dataNode)});
+            }
+            
+            logger.info("Read " + data.size() + " items from JSON file");
+            return data;
+        } catch (IOException e) {
+            throw new CSSmartException("Failed to read JSON file: " + filePath, e);
+        }
+    }
+    
+    /**
+     * Convert a JSON node to a map
+     * @param node the JSON node
+     * @return the map
+     */
+    private static Map<String, Object> convertJsonNodeToMap(JsonNode node) {
+        Map<String, Object> map = new HashMap<>();
+        
+        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> field = fields.next();
+            map.put(field.getKey(), convertJsonNode(field.getValue()));
+        }
+        
+        return map;
+    }
+    
+    /**
+     * Convert a JSON node to a Java object
+     * @param node the JSON node
+     * @return the Java object
+     */
+    private static Object convertJsonNode(JsonNode node) {
+        if (node.isNull()) {
+            return null;
+        } else if (node.isTextual()) {
+            return node.asText();
+        } else if (node.isInt()) {
+            return node.asInt();
+        } else if (node.isLong()) {
+            return node.asLong();
+        } else if (node.isDouble()) {
+            return node.asDouble();
+        } else if (node.isBoolean()) {
+            return node.asBoolean();
+        } else if (node.isObject()) {
+            return convertJsonNodeToMap(node);
+        } else if (node.isArray()) {
+            List<Object> list = new ArrayList<>();
+            for (JsonNode item : node) {
+                list.add(convertJsonNode(item));
+            }
+            return list;
+        } else {
+            return node.toString();
+        }
+    }
+    
+    @Override
+    public List<Object[]> getData() {
+        return readJSON(filePath, jsonPath);
+    }
+}
+
+/**
+ * CSSmartDBDataSource.java
+ * Database-driven testing
+ */
+package com.cssmart.data;
+
+import com.cssmart.db.CSSmartDBConnection;
+import com.cssmart.exceptions.CSSmartDBException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class CSSmartDBDataSource implements CSSmartDataProvider.DataSource {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private final String query;
+    
+    /**
+     * Constructor
+     * @param query the SQL query
+     */
+    public CSSmartDBDataSource(String query) {
+        this.query = query;
+    }
+    
+    /**
+     * Execute a SQL query
+     * @param query the SQL query
+     * @return the test data
+     */
+    public static List<Object[]> executeQuery(String query) {
+        logger.info("Executing SQL query: " + query);
+        
+        Connection connection = null;
+        Statement statement = null;
+        ResultSet resultSet = null;
+        
+        try {
+            connection = CSSmartDBConnection.getConnection();
+            statement = connection.createStatement();
+            resultSet = statement.executeQuery(query);
+            
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            
+            List<String> columnNames = new ArrayList<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames.add(metaData.getColumnName(i));
+            }
+            
+            List<Object[]> data = new ArrayList<>();
+            
+            while (resultSet.next()) {
+                Map<String, Object> rowData = new HashMap<>();
+                boolean hasData = false;
+                
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = columnNames.get(i - 1);
+                    Object value = resultSet.getObject(i);
+                    
+                    if (value != null) {
+                        hasData = true;
+                        rowData.put(columnName, value);
+                    }
+                }
+                
+                if (hasData) {
+                    data.add(new Object[]{rowData});
+                }
+            }
+            
+            logger.info("Read " + data.size() + " rows from database");
+            return data;
+        } catch (SQLException e) {
+            throw new CSSmartDBException("Failed to execute SQL query: " + query, e);
+        } finally {
+            try {
+                if (resultSet != null) resultSet.close();
+                if (statement != null) statement.close();
+                if (connection != null) connection.close();
+            } catch (SQLException e) {
+                logger.error("Failed to close database resources", e);
+            }
+        }
+    }
+    
+    @Override
+    public List<Object[]> getData() {
+        return executeQuery(query);
+    }
+}
+
+/**
+ * CSSmartDataTransformer.java
+ * Data manipulation utilities
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+public class CSSmartDataTransformer {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    
+    /**
+     * Filter test data
+     * @param data the test data
+     * @param filter the filter predicate
+     * @return the filtered test data
+     */
+    public static List<Object[]> filter(List<Object[]> data, Predicate<Map<String, Object>> filter) {
+        logger.debug("Filtering test data");
+        
+        List<Object[]> filteredData = new ArrayList<>();
+        
+        for (Object[] row : data) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                
+                if (filter.test(rowData)) {
+                    filteredData.add(row);
+                }
+            }
+        }
+        
+        logger.debug("Filtered " + data.size() + " rows to " + filteredData.size() + " rows");
+        return filteredData;
+    }
+    
+    /**
+     * Map test data
+     * @param data the test data
+     * @param mapper the mapper function
+     * @return the mapped test data
+     */
+    public static List<Object[]> map(List<Object[]> data, Function<Map<String, Object>, Map<String, Object>> mapper) {
+        logger.debug("Mapping test data");
+        
+        List<Object[]> mappedData = new ArrayList<>();
+        
+        for (Object[] row : data) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                
+                Map<String, Object> mappedRow = mapper.apply(new HashMap<>(rowData));
+                mappedData.add(new Object[]{mappedRow});
+            } else {
+                mappedData.add(row);
+            }
+        }
+        
+        logger.debug("Mapped " + data.size() + " rows");
+        return mappedData;
+    }
+    
+    /**
+     * Group test data by a key
+     * @param data the test data
+     * @param keyExtractor the key extractor function
+     * @return the grouped test data
+     */
+    public static <K> Map<K, List<Map<String, Object>>> groupBy(List<Object[]> data, 
+                                                         Function<Map<String, Object>, K> keyExtractor) {
+        logger.debug("Grouping test data");
+        
+        Map<K, List<Map<String, Object>>> groupedData = new HashMap<>();
+        
+        for (Object[] row : data) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                
+                K key = keyExtractor.apply(rowData);
+                groupedData.computeIfAbsent(key, k -> new ArrayList<>()).add(rowData);
+            }
+        }
+        
+        logger.debug("Grouped " + data.size() + " rows into " + groupedData.size() + " groups");
+        return groupedData;
+    }
+    
+    /**
+     * Sort test data
+     * @param data the test data
+     * @param keyExtractor the key extractor function
+     * @param ascending whether to sort in ascending order
+     * @return the sorted test data
+     */
+    public static <K extends Comparable<K>> List<Object[]> sort(List<Object[]> data, 
+                                                          Function<Map<String, Object>, K> keyExtractor,
+                                                          boolean ascending) {
+        logger.debug("Sorting test data");
+        
+        List<Map<String, Object>> rows = new ArrayList<>();
+        
+        for (Object[] row : data) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                rows.add(rowData);
+            }
+        }
+        
+        rows.sort((r1, r2) -> {
+            K k1 = keyExtractor.apply(r1);
+            K k2 = keyExtractor.apply(r2);
+            return ascending ? k1.compareTo(k2) : k2.compareTo(k1);
+        });
+        
+        List<Object[]> sortedData = rows.stream()
+            .map(row -> new Object[]{row})
+            .collect(Collectors.toList());
+        
+        logger.debug("Sorted " + data.size() + " rows");
+        return sortedData;
+    }
+    
+    /**
+     * Combine test data from multiple sources
+     * @param dataSets the data sets to combine
+     * @return the combined test data
+     */
+    @SafeVarargs
+    public static List<Object[]> combine(List<Object[]>... dataSets) {
+        logger.debug("Combining test data sets");
+        
+        List<Object[]> combinedData = new ArrayList<>();
+        
+        for (List<Object[]> dataSet : dataSets) {
+            combinedData.addAll(dataSet);
+        }
+        
+        logger.debug("Combined " + dataSets.length + " data sets with a total of " + combinedData.size() + " rows");
+        return combinedData;
+    }
+    
+    /**
+     * Join test data from two sources
+     * @param leftData the left data
+     * @param rightData the right data
+     * @param leftKeyExtractor the left key extractor
+     * @param rightKeyExtractor the right key extractor
+     * @param joinType the join type
+     * @return the joined test data
+     */
+    public static <K> List<Object[]> join(List<Object[]> leftData, 
+                                   List<Object[]> rightData,
+                                   Function<Map<String, Object>, K> leftKeyExtractor,
+                                   Function<Map<String, Object>, K> rightKeyExtractor,
+                                   JoinType joinType) {
+        logger.debug("Joining test data with join type: " + joinType);
+        
+        List<Object[]> joinedData = new ArrayList<>();
+        
+        // Extract rows from both data sets
+        List<Map<String, Object>> leftRows = new ArrayList<>();
+        for (Object[] row : leftData) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                leftRows.add(rowData);
+            }
+        }
+        
+        List<Map<String, Object>> rightRows = new ArrayList<>();
+        for (Object[] row : rightData) {
+            if (row.length > 0 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowData = (Map<String, Object>) row[0];
+                rightRows.add(rowData);
+            }
+        }
+        
+        // Group right rows by key for faster lookups
+        Map<K, List<Map<String, Object>>> rightRowsByKey = new HashMap<>();
+        for (Map<String, Object> rightRow : rightRows) {
+            K key = rightKeyExtractor.apply(rightRow);
+            rightRowsByKey.computeIfAbsent(key, k -> new ArrayList<>()).add(rightRow);
+        }
+        
+        // Perform the join
+        for (Map<String, Object> leftRow : leftRows) {
+            K leftKey = leftKeyExtractor.apply(leftRow);
+            List<Map<String, Object>> matchingRightRows = rightRowsByKey.getOrDefault(leftKey, new ArrayList<>());
+            
+            if (matchingRightRows.isEmpty()) {
+                // No matching right rows
+                if (joinType == JoinType.LEFT || joinType == JoinType.FULL) {
+                    // Include left row with null right values
+                    Map<String, Object> joinedRow = new HashMap<>(leftRow);
+                    joinedData.add(new Object[]{joinedRow});
+                }
+            } else {
+                // Matching right rows found
+                for (Map<String, Object> rightRow : matchingRightRows) {
+                    // Combine left and right rows
+                    Map<String, Object> joinedRow = new HashMap<>(leftRow);
+                    
+                    // Add right row values with prefixed keys to avoid collisions
+                    for (Map.Entry<String, Object> entry : rightRow.entrySet()) {
+                        joinedRow.put("right_" + entry.getKey(), entry.getValue());
+                    }
+                    
+                    joinedData.add(new Object[]{joinedRow});
+                }
+            }
+        }
+        
+        // Add right rows with no matching left rows (for RIGHT and FULL joins)
+        if (joinType == JoinType.RIGHT || joinType == JoinType.FULL) {
+            // Get all right keys that were not matched
+            Set<K> matchedRightKeys = leftRows.stream()
+                .map(leftKeyExtractor)
+                .filter(rightRowsByKey::containsKey)
+                .collect(Collectors.toSet());
+            
+            // Add the remaining right rows
+            for (Map.Entry<K, List<Map<String, Object>>> entry : rightRowsByKey.entrySet()) {
+                if (!matchedRightKeys.contains(entry.getKey())) {
+                    for (Map<String, Object> rightRow : entry.getValue()) {
+                        Map<String, Object> joinedRow = new HashMap<>();
+                        
+                        // Add right row values with prefixed keys
+                        for (Map.Entry<String, Object> valueEntry : rightRow.entrySet()) {
+                            joinedRow.put("right_" + valueEntry.getKey(), valueEntry.getValue());
+                        }
+                        
+                        joinedData.add(new Object[]{joinedRow});
+                    }
+                }
+            }
+        }
+        
+        logger.debug("Joined " + leftData.size() + " left rows and " + rightData.size() + 
+            " right rows into " + joinedData.size() + " rows");
+        return joinedData;
+    }
+    
+    /**
+     * Join type enum
+     */
+    public enum JoinType {
+        INNER,  // Only rows with matching keys in both data sets
+        LEFT,   // All rows from left data set, plus matching rows from right
+        RIGHT,  // All rows from right data set, plus matching rows from left
+        FULL    // All rows from both data sets
+    }
+    
+    /**
+     * Convert test data to a different format
+     * @param data the test data
+     * @param targetType the target type
+     * @return the converted test data
+     */
+    public static List<Object[]> convert(List<Object[]> data, TargetType targetType) {
+        logger.debug("Converting test data to " + targetType);
+        
+        switch (targetType) {
+            case SINGLE_OBJECTS:
+                return convertToSingleObjects(data);
+            case OBJECT_ARRAYS:
+                return convertToObjectArrays(data);
+            case COLUMN_BASED:
+                return convertToColumnBased(data);
+            default:
+                throw new CSSmartException("Unsupported target type: " + targetType);
+        }
+    }
+    
+    /**
+     * Convert test data to single objects
+     * @param data the test data
+     * @return the converted test data
+     */
+    private static List<Object[]> convertToSingleObjects(List<Object[]> data) {
+        List<Object[]> convertedData = new ArrayList<>();
+        
+        for (Object[] row : data) {
+            if (row.length == 1 && row[0] instanceof Map) {
+                // Already in the right format
+                convertedData.add(row);
+            } else {
+                // Convert array to Map
+                Map<String, Object> rowMap = new HashMap<>();
+                for (int i = 0; i < row.length; i++) {
+                    rowMap.put("Column" + i, row[i]);
+                }
+                convertedData.add(new Object[]{rowMap});
+            }
+        }
+        
+        return convertedData;
+    }
+    
+    /**
+     * Convert test data to object arrays
+     * @param data the test data
+     * @return the converted test data
+     */
+    private static List<Object[]> convertToObjectArrays(List<Object[]> data) {
+        List<Object[]> convertedData = new ArrayList<>();
+        
+        for (Object[] row : data) {
+            if (row.length == 1 && row[0] instanceof Map) {
+                // Convert Map to array
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowMap = (Map<String, Object>) row[0];
+                Object[] rowArray = rowMap.values().toArray();
+                convertedData.add(rowArray);
+            } else {
+                // Already in the right format
+                convertedData.add(row);
+            }
+        }
+        
+        return convertedData;
+    }
+    
+    /**
+     * Convert test data to column-based format
+     * @param data the test data
+     * @return the converted test data
+     */
+    private static List<Object[]> convertToColumnBased(List<Object[]> data) {
+        if (data.isEmpty()) {
+            return data;
+        }
+        
+        // Determine column names
+        Set<String> columnNames = new HashSet<>();
+        for (Object[] row : data) {
+            if (row.length == 1 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowMap = (Map<String, Object>) row[0];
+                columnNames.addAll(rowMap.keySet());
+            }
+        }
+        
+        // Create column-based data
+        Map<String, List<Object>> columns = new HashMap<>();
+        for (String columnName : columnNames) {
+            columns.put(columnName, new ArrayList<>());
+        }
+        
+        // Fill columns
+        for (Object[] row : data) {
+            if (row.length == 1 && row[0] instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rowMap = (Map<String, Object>) row[0];
+                
+                for (String columnName : columnNames) {
+                    columns.get(columnName).add(rowMap.getOrDefault(columnName, null));
+                }
+            }
+        }
+        
+        // Create result
+        List<Object[]> convertedData = new ArrayList<>();
+        for (Map.Entry<String, List<Object>> entry : columns.entrySet()) {
+            convertedData.add(new Object[]{entry.getKey(), entry.getValue()});
+        }
+        
+        return convertedData;
+    }
+    
+    /**
+     * Target type enum
+     */
+    public enum TargetType {
+        SINGLE_OBJECTS,  // Each row is a single Map object
+        OBJECT_ARRAYS,   // Each row is an array of objects
+        COLUMN_BASED     // Data is organized by columns
+    }
+}
+
+/**
+ * CSSmartDataProviderRegistry.java
+ * Central registry for data providers
+ */
+package com.cssmart.data;
+
+import com.cssmart.annotations.CSSmartDataProvider.DataSourceType;
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+
+import java.lang.reflect.Method;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class CSSmartDataProviderRegistry {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private static final CSSmartDataProviderRegistry INSTANCE = new CSSmartDataProviderRegistry();
+    
+    private final Map<String, DataProviderInfo> dataProviders = new ConcurrentHashMap<>();
+    
+    /**
+     * Private constructor
+     */
+    private CSSmartDataProviderRegistry() {
+        logger.info("Initializing CSSmartDataProviderRegistry");
+    }
+    
+    /**
+     * Get the singleton instance
+     * @return the instance
+     */
+    public static CSSmartDataProviderRegistry getInstance() {
+        return INSTANCE;
+    }
+    
+    /**
+     * Register an Excel data provider
+     * @param method the test method (null for global)
+     * @param path the file path
+     * @param sheet the sheet name
+     */
+    public void registerExcelDataProvider(Method method, String path, String sheet) {
+        String key = getKey(method, path);
+        
+        CSSmartExcelReader reader = new CSSmartExcelReader(path, sheet);
+        dataProviders.put(key, new DataProviderInfo(DataSourceType.EXCEL, path, reader));
+        
+        logger.info("Registered Excel data provider: " + key);
+    }
+    
+    /**
+     * Register a CSV data provider
+     * @param method the test method (null for global)
+     * @param path the file path
+     */
+    public void registerCSVDataProvider(Method method, String path) {
+        String key = getKey(method, path);
+        
+        CSSmartCSVReader reader = new CSSmartCSVReader(path);
+        dataProviders.put(key, new DataProviderInfo(DataSourceType.CSV, path, reader));
+        
+        logger.info("Registered CSV data provider: " + key);
+    }
+    
+    /**
+     * Register a JSON data provider
+     * @param method the test method (null for global)
+     * @param path the file path
+     * @param jsonPath the JSON path
+     */
+    public void registerJSONDataProvider(Method method, String path, String jsonPath) {
+        String key = getKey(method, path);
+        
+        CSSmartJSONReader reader = new CSSmartJSONReader(path, jsonPath);
+        dataProviders.put(key, new DataProviderInfo(DataSourceType.JSON, path, reader));
+        
+        logger.info("Registered JSON data provider: " + key);
+    }
+    
+    /**
+     * Register a database data provider
+     * @param method the test method (null for global)
+     * @param query the SQL query
+     */
+    public void registerDBDataProvider(Method method, String query) {
+        String key = getKey(method, query);
+        
+        CSSmartDBDataSource dataSource = new CSSmartDBDataSource(query);
+        dataProviders.put(key, new DataProviderInfo(DataSourceType.DATABASE, query, dataSource));
+        
+        logger.info("Registered database data provider: " + key);
+    }
+    
+    /**
+     * Register a YAML data provider
+     * @param method the test method (null for global)
+     * @param path the file path
+     */
+    public void registerYAMLDataProvider(Method method, String path) {
+        String key = getKey(method, path);
+        
+        CSSmartYAMLReader reader = new CSSmartYAMLReader(path);
+        dataProviders.put(key, new DataProviderInfo(DataSourceType.YAML, path, reader));
+        
+        logger.info("Registered YAML data provider: " + key);
+    }
+    
+    /**
+     * Get data for a method
+     * @param method the method
+     * @return the test data
+     */
+    public Iterator<Object[]> getDataForMethod(Method method) {
+        // First try method-specific data provider
+        String methodKey = getKey(method, null);
+        DataProviderInfo info = dataProviders.get(methodKey);
+        
+        if (info != null) {
+            logger.info("Using method-specific data provider for: " + method.getName());
+            return info.dataSource.getData().iterator();
+        }
+        
+        // Try class-wide data provider
+        String classKey = getKey(null, method.getDeclaringClass().getName());
+        info = dataProviders.get(classKey);
+        
+        if (info != null) {
+            logger.info("Using class-wide data provider for: " + method.getDeclaringClass().getName());
+            return info.dataSource.getData().iterator();
+        }
+        
+        throw new CSSmartException("No data provider found for method: " + method.getName());
+    }
+    
+    /**
+     * Get a key for the registry
+     * @param method the method
+     * @param path the path
+     * @return the key
+     */
+    private String getKey(Method method, String path) {
+        if (method != null) {
+            return method.getDeclaringClass().getName() + "." + method.getName();
+        } else if (path != null) {
+            return path;
+        } else {
+            throw new CSSmartException("Both method and path cannot be null");
+        }
+    }
+    
+    /**
+     * Clear the registry
+     */
+    public void clear() {
+        dataProviders.clear();
+        logger.info("Cleared data provider registry");
+    }
+    
+    /**
+     * Data provider info class
+     */
+    private static class DataProviderInfo {
+        private final DataSourceType type;
+        private final String source;
+        private final CSSmartDataProvider.DataSource dataSource;
+        
+        /**
+         * Constructor
+         * @param type the data source type
+         * @param source the source (file path, query, etc.)
+         * @param dataSource the data source
+         */
+        public DataProviderInfo(DataSourceType type, String source, CSSmartDataProvider.DataSource dataSource) {
+            this.type = type;
+            this.source = source;
+            this.dataSource = dataSource;
+        }
+    }
+}
+
+/**
+ * CSSmartYAMLReader.java
+ * YAML data source
+ */
+package com.cssmart.data;
+
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.logging.CSSmartLogger;
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class CSSmartYAMLReader implements CSSmartDataProvider.DataSource {
+    private static final CSSmartLogger logger = CSSmartLogger.getInstance();
+    private final String filePath;
+    
+    /**
+     * Constructor
+     * @param filePath the file path
+     */
+    public CSSmartYAMLReader(String filePath) {
+        this.filePath = filePath;
+    }
+    
+    /**
+     * Read a YAML file
+     * @param filePath the file path
+     * @return the test data
+     */
+    public static List<Object[]> readYAML(String filePath) {
+        logger.info("Reading YAML file: " + filePath);
+        
+        try (InputStream inputStream = new FileInputStream(new File(filePath))) {
+            Yaml yaml = new Yaml();
+            Object yamlData = yaml.load(inputStream);
+            
+            List<Object[]> data = new ArrayList<>();
+            
+            if (yamlData instanceof List) {
+                // List of objects
+                @SuppressWarnings("unchecked")
+                List<Object> list = (List<Object>) yamlData;
+                
+                for (Object item : list) {
+                    if (item instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> rowData = (Map<String, Object>) item;
+                        data.add(new Object[]{rowData});
+                    } else {
+                        data.add(new Object[]{item});
+                    }
+                }
+            } else if (yamlData instanceof Map) {
+                // Single object or map of objects
+                @SuppressWarnings("unchecked")
+                Map<String, Object> map = (Map<String, Object>) yamlData;
+                
+                // Check if this is a map of test data rows
+                boolean isDataTable = true;
+                for (Object value : map.values()) {
+                    if (!(value instanceof Map)) {
+                        isDataTable = false;
+                        break;
+                    }
+                }
+                
+                if (isDataTable) {
+                    // Map of test data rows
+                    for (Map.Entry<String, Object> entry : map.entrySet()) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> rowData = new HashMap<>((Map<String, Object>) entry.getValue());
+                        // Add the key as an identifier
+                        rowData.put("_id", entry.getKey());
+                        data.add(new Object[]{rowData});
+                    }
+                } else {
+                    // Single object
+                    data.add(new Object[]{map});
+                }
+            }
+            
+            logger.info("Read " + data.size() + " items from YAML file");
+            return data;
+        } catch (IOException e) {
+            throw new CSSmartException("Failed to read YAML file: " + filePath, e);
+        }
+    }
+    
+    @Override
+    public List<Object[]> getData() {
+        return readYAML(filePath);
+    }
+}
+
+
