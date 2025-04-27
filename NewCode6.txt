@@ -2919,3 +2919,33 @@ public class CSSmartTestPathAnalyzer {
         }
     }
 }
+
+
+/**
+ * Registers a smart data provider for AI-generated test data
+ * 
+ * @param method the test method to associate with this data provider (can be null for class-level)
+ * @param targetForm the form or UI element to generate test data for
+ * @param coverage the desired test coverage level
+ * @param constraints the constraints to apply to generated data
+ */
+public void registerSmartDataProvider(Method method, String targetForm, 
+                                     Coverage coverage, Constraint[] constraints) {
+    logger.info("Registering smart data provider for " + 
+               (method != null ? "method: " + method.getName() : "class"));
+    
+    // Create a configuration object to store smart generation parameters
+    Map<String, Object> config = new HashMap<>();
+    config.put("targetForm", targetForm);
+    config.put("coverage", coverage);
+    config.put("constraints", constraints);
+    
+    // Store the configuration for this method or class
+    String key = method != null ? method.getDeclaringClass().getName() + "." + method.getName() : 
+                                "class-level";
+    smartDataProviders.put(key, config);
+    
+    // Log registration details
+    logger.debug("Smart data provider registered with target: " + targetForm + 
+                ", coverage: " + coverage);
+}
