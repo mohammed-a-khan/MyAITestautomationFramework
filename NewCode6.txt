@@ -1564,3 +1564,1358 @@ public class CSSmartWebElement implements WebElement, TakesScreenshot {
         }
     }
 }
+
+
+
+
+package com.cssmart.framework.utils;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+/**
+ * Utility class for cryptographic operations
+ */
+public class CSSmartCryptoUtils {
+    
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(CSSmartCryptoUtils.class);
+    
+    /**
+     * Computes the SHA-256 hash of a string
+     * 
+     * @param input the string to hash
+     * @return the SHA-256 hash as a hex string
+     */
+    public static String sha256Hash(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            return bytesToHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            logger.error("SHA-256 algorithm not available", e);
+            // Fallback to simple hashing if SHA-256 is not available
+            return String.valueOf(input.hashCode());
+        }
+    }
+    
+    /**
+     * Converts bytes to a hexadecimal string
+     * 
+     * @param bytes the bytes to convert
+     * @return a hexadecimal string
+     */
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder builder = new StringBuilder();
+        for (byte b : bytes) {
+            builder.append(String.format("%02x", b));
+        }
+        return builder.toString();
+    }
+    
+    /**
+     * Encodes a string to Base64
+     * 
+     * @param input the string to encode
+     * @return the Base64 encoded string
+     */
+    public static String base64Encode(String input) {
+        return Base64.getEncoder().encodeToString(input.getBytes(StandardCharsets.UTF_8));
+    }
+    
+    /**
+     * Decodes a Base64 string
+     * 
+     * @param encoded the Base64 encoded string
+     * @return the decoded string
+     */
+    public static String base64Decode(String encoded) {
+        try {
+            byte[] decodedBytes = Base64.getDecoder().decode(encoded);
+            return new String(decodedBytes, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid Base64 string: " + encoded, e);
+            return encoded; // Return original string if decoding fails
+        }
+    }
+}
+
+
+
+
+
+package com.cssmart.framework.utils;
+
+import java.util.List;
+
+/**
+ * Utility class for statistical operations
+ */
+public class CSSmartStatisticsUtil {
+    
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(CSSmartStatisticsUtil.class);
+    
+    /**
+     * Calculates the mean (average) of a list of doubles
+     * 
+     * @param values the list of values
+     * @return the mean value
+     */
+    public static double calculateMean(List<Double> values) {
+        if (values == null || values.isEmpty()) {
+            return 0.0;
+        }
+        
+        double sum = 0.0;
+        for (Double value : values) {
+            sum += value;
+        }
+        
+        return sum / values.size();
+    }
+    
+    /**
+     * Calculates the standard deviation of a list of doubles
+     * 
+     * @param values the list of values
+     * @return the standard deviation
+     */
+    public static double calculateStandardDeviation(List<Double> values) {
+        if (values == null || values.size() <= 1) {
+            return 0.0;
+        }
+        
+        double mean = calculateMean(values);
+        double sumSquaredDiff = 0.0;
+        
+        for (Double value : values) {
+            double diff = value - mean;
+            sumSquaredDiff += diff * diff;
+        }
+        
+        return Math.sqrt(sumSquaredDiff / values.size());
+    }
+    
+    /**
+     * Calculates the correlation coefficient between two lists of doubles
+     * 
+     * @param xValues the first list of values
+     * @param yValues the second list of values
+     * @return the correlation coefficient (-1.0 to 1.0), or 0.0 if calculation fails
+     */
+    public static double calculateCorrelation(List<Double> xValues, List<Double> yValues) {
+        if (xValues == null || yValues == null || xValues.size() != yValues.size() || xValues.isEmpty()) {
+            logger.warning("Cannot calculate correlation with invalid inputs");
+            return 0.0;
+        }
+        
+        try {
+            int n = xValues.size();
+            
+            // Calculate means
+            double xMean = calculateMean(xValues);
+            double yMean = calculateMean(yValues);
+            
+            // Calculate sums for the formulas
+            double sumXY = 0.0;
+            double sumX2 = 0.0;
+            double sumY2 = 0.0;
+            
+            for (int i = 0; i < n; i++) {
+                double xDiff = xValues.get(i) - xMean;
+                double yDiff = yValues.get(i) - yMean;
+                
+                sumXY += xDiff * yDiff;
+                sumX2 += xDiff * xDiff;
+                sumY2 += yDiff * yDiff;
+            }
+            
+            // Calculate correlation (Pearson's r)
+            if (sumX2 > 0 && sumY2 > 0) {
+                return sumXY / (Math.sqrt(sumX2) * Math.sqrt(sumY2));
+            } else {
+                return 0.0; // No variation in at least one of the variables
+            }
+        } catch (Exception e) {
+            logger.error("Error calculating correlation: " + e.getMessage(), e);
+            return 0.0;
+        }
+    }
+    
+    /**
+     * Calculates the percentile of a list of doubles
+     * 
+     * @param values the list of values
+     * @param percentile the percentile to calculate (0-100)
+     * @return the percentile value
+     */
+    public static double calculatePercentile(List<Double> values, double percentile) {
+        if (values == null || values.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Make a copy of the list and sort it
+        List<Double> sortedValues = new java.util.ArrayList<>(values);
+        java.util.Collections.sort(sortedValues);
+        
+        // Calculate the index
+        double index = percentile * (sortedValues.size() - 1) / 100.0;
+        int lowerIndex = (int) Math.floor(index);
+        int upperIndex = (int) Math.ceil(index);
+        
+        if (lowerIndex == upperIndex) {
+            return sortedValues.get(lowerIndex);
+        } else {
+            // Interpolate between the two values
+            double weight = index - lowerIndex;
+            return (1 - weight) * sortedValues.get(lowerIndex) + weight * sortedValues.get(upperIndex);
+        }
+    }
+    
+    /**
+     * Calculates the median of a list of doubles
+     * 
+     * @param values the list of values
+     * @return the median value
+     */
+    public static double calculateMedian(List<Double> values) {
+        return calculatePercentile(values, 50.0);
+    }
+}
+
+
+package com.cssmart.framework.ai;
+
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+
+import com.cssmart.framework.config.CSSmartConfigManager;
+import com.cssmart.framework.logging.CSSmartLogger;
+import com.cssmart.framework.reporting.CSSmartReport;
+import com.cssmart.framework.utils.CSSmartCryptoUtils;
+import com.cssmart.framework.utils.CSSmartStatisticsUtil;
+
+/**
+ * Implements a machine learning based test path analyzer that learns from test
+ * executions and suggests optimal test execution paths
+ */
+public class CSSmartTestPathAnalyzer {
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(CSSmartTestPathAnalyzer.class);
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private static CSSmartTestPathAnalyzer instance;
+    
+    // Configuration
+    private final boolean enabled;
+    private final String dataStoragePath;
+    private final int minimumDataPoints;
+    
+    // Test execution history
+    private final Map<String, TestExecutionData> testHistory;
+    
+    // Path analysis cache
+    private final Map<String, PathAnalysisResult> analysisCache;
+    
+    // Feature weights - will be adjusted through learning
+    private final Map<String, Double> featureWeights;
+    
+    // Current test session data
+    private final Map<String, List<TestStepData>> currentSession;
+    
+    // Last training time
+    private Instant lastModelTrainingTime;
+    
+    /**
+     * Private constructor to enforce singleton pattern
+     */
+    private CSSmartTestPathAnalyzer() {
+        CSSmartConfigManager config = CSSmartConfigManager.getInstance();
+        
+        // Initialize configuration
+        this.enabled = config.getBooleanProperty("testpath.analyzer.enabled", true);
+        this.dataStoragePath = config.getProperty("testpath.analyzer.data.path", 
+                                                  System.getProperty("user.home") + File.separator + 
+                                                  ".cssmart" + File.separator + "testdata");
+        this.minimumDataPoints = config.getIntProperty("testpath.analyzer.min.datapoints", 5);
+                
+        // Initialize data structures
+        this.testHistory = new ConcurrentHashMap<>();
+        this.analysisCache = new ConcurrentHashMap<>();
+        this.featureWeights = initializeFeatureWeights();
+        this.currentSession = new ConcurrentHashMap<>();
+        
+        // Create storage directory if needed
+        createDataStorageDirectory();
+        
+        // Load historical data
+        loadTestExecutionHistory();
+        
+        logger.info("Test Path Analyzer initialized. Enabled: " + enabled);
+    }
+    
+    /**
+     * Gets the singleton instance of CSSmartTestPathAnalyzer
+     */
+    public static synchronized CSSmartTestPathAnalyzer getInstance() {
+        if (instance == null) {
+            instance = new CSSmartTestPathAnalyzer();
+        }
+        return instance;
+    }
+    
+    /**
+     * Initializes feature weights with default values
+     */
+    private Map<String, Double> initializeFeatureWeights() {
+        Map<String, Double> weights = new HashMap<>();
+        
+        // Default weights based on importance of different features
+        weights.put("executionTime", 1.0);      // Execution time is a primary factor
+        weights.put("passRate", 1.5);           // Pass rate is highly important
+        weights.put("complexity", 0.8);         // Test complexity matters but less than pass rate
+        weights.put("dataDependency", 0.6);     // Data dependencies between tests
+        weights.put("resourceUsage", 0.4);      // Resource usage is less important initially
+        weights.put("coverageGain", 1.2);       // Coverage gain is important
+        weights.put("flakiness", 1.3);          // Flakiness is very important to consider
+        weights.put("lastExecutionStatus", 0.7); // Recent failures might need prioritization
+        weights.put("age", 0.3);                // How recently the test was created/modified
+        weights.put("userPriority", 1.1);       // User-defined priority can override algorithms
+        
+        return weights;
+    }
+    
+    /**
+     * Creates data storage directory if it doesn't exist
+     */
+    private void createDataStorageDirectory() {
+        try {
+            Path directory = Paths.get(dataStoragePath);
+            if (!Files.exists(directory)) {
+                Files.createDirectories(directory);
+                logger.info("Created test path analyzer data directory: " + dataStoragePath);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to create data directory: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Loads historical test execution data from files
+     */
+    private void loadTestExecutionHistory() {
+        if (!enabled) return;
+        
+        try {
+            loadHistoryFromFiles();
+            
+            int historySize = testHistory.size();
+            logger.info("Loaded " + historySize + " test execution records");
+            
+            // Pre-calculate analysis results for common test suites
+            if (historySize >= minimumDataPoints) {
+                updateModel();
+            }
+        } catch (Exception e) {
+            logger.error("Error loading test execution history: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Loads test history from file storage
+     */
+    private void loadHistoryFromFiles() throws Exception {
+        Path historyDir = Paths.get(dataStoragePath);
+        if (!Files.exists(historyDir)) {
+            return;
+        }
+        
+        // Iterate through all JSON files in the directory
+        Files.list(historyDir)
+            .filter(path -> path.toString().endsWith(".json"))
+            .forEach(path -> {
+                try {
+                    String content = new String(Files.readAllBytes(path));
+                    TestExecutionData data = parseTestExecutionData(content);
+                    if (data != null && data.getTestId() != null) {
+                        testHistory.put(data.getTestId(), data);
+                    }
+                } catch (Exception e) {
+                    logger.debug("Error loading test history file: " + path, e);
+                }
+            });
+    }
+    
+    /**
+     * Parses test execution data from JSON string
+     */
+    private TestExecutionData parseTestExecutionData(String json) {
+        try {
+            // Simple JSON parsing without external libraries
+            TestExecutionData data = new TestExecutionData();
+            
+            // Extract testId
+            String testIdPattern = "\"testId\"\\s*:\\s*\"([^\"]+)\"";
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(testIdPattern);
+            java.util.regex.Matcher matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setTestId(matcher.group(1));
+            }
+            
+            // Extract execution time
+            String executionTimePattern = "\"executionTime\"\\s*:\\s*(\\d+)";
+            pattern = java.util.regex.Pattern.compile(executionTimePattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setExecutionTime(Long.parseLong(matcher.group(1)));
+            }
+            
+            // Extract result
+            String resultPattern = "\"result\"\\s*:\\s*\"([^\"]+)\"";
+            pattern = java.util.regex.Pattern.compile(resultPattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setResult(matcher.group(1));
+            }
+            
+            // Extract duration
+            String durationPattern = "\"duration\"\\s*:\\s*(\\d+)";
+            pattern = java.util.regex.Pattern.compile(durationPattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setDuration(Long.parseLong(matcher.group(1)));
+            }
+            
+            // Extract resource usage
+            String resourceUsagePattern = "\"resourceUsage\"\\s*:\\s*([\\d.]+)";
+            pattern = java.util.regex.Pattern.compile(resourceUsagePattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setResourceUsage(Double.parseDouble(matcher.group(1)));
+            }
+            
+            // Extract complexity score
+            String complexityPattern = "\"complexityScore\"\\s*:\\s*([\\d.]+)";
+            pattern = java.util.regex.Pattern.compile(complexityPattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setComplexityScore(Double.parseDouble(matcher.group(1)));
+            }
+            
+            // Extract flakiness
+            String flakinessPattern = "\"flakiness\"\\s*:\\s*([\\d.]+)";
+            pattern = java.util.regex.Pattern.compile(flakinessPattern);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                data.setFlakiness(Double.parseDouble(matcher.group(1)));
+            }
+            
+            // Extract dependencies
+            String dependenciesPattern = "\"dependencies\"\\s*:\\s*(\\[.*?\\])";
+            pattern = java.util.regex.Pattern.compile(dependenciesPattern, java.util.regex.Pattern.DOTALL);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                String dependenciesJson = matcher.group(1);
+                data.setDependencies(parseStringList(dependenciesJson));
+            }
+            
+            // Extract coverage
+            String coveragePattern = "\"coverage\"\\s*:\\s*(\\{.*?\\})";
+            pattern = java.util.regex.Pattern.compile(coveragePattern, java.util.regex.Pattern.DOTALL);
+            matcher = pattern.matcher(json);
+            if (matcher.find()) {
+                String coverageJson = matcher.group(1);
+                data.setCoverage(parseMap(coverageJson));
+            }
+            
+            return data;
+        } catch (Exception e) {
+            logger.debug("Error parsing test execution data: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Parses a JSON string list into a List<String>
+     */
+    private List<String> parseStringList(String json) {
+        List<String> result = new ArrayList<>();
+        try {
+            // Basic JSON array parsing
+            if (json.startsWith("[") && json.endsWith("]")) {
+                String content = json.substring(1, json.length() - 1);
+                String[] items = content.split(",");
+                
+                for (String item : items) {
+                    // Remove quotes and trim
+                    item = item.trim();
+                    if (item.startsWith("\"") && item.endsWith("\"")) {
+                        item = item.substring(1, item.length() - 1);
+                    }
+                    result.add(item);
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Error parsing string list: " + e.getMessage());
+        }
+        return result;
+    }
+    
+    /**
+     * Parses a JSON map into a Map<String, Double>
+     */
+    private Map<String, Double> parseMap(String json) {
+        Map<String, Double> result = new HashMap<>();
+        try {
+            // Basic JSON object parsing
+            if (json.startsWith("{") && json.endsWith("}")) {
+                String content = json.substring(1, json.length() - 1);
+                String[] pairs = content.split(",");
+                
+                for (String pair : pairs) {
+                    String[] keyValue = pair.split(":");
+                    if (keyValue.length == 2) {
+                        String key = keyValue[0].trim();
+                        String value = keyValue[1].trim();
+                        
+                        // Remove quotes from key
+                        if (key.startsWith("\"") && key.endsWith("\"")) {
+                            key = key.substring(1, key.length() - 1);
+                        }
+                        
+                        result.put(key, Double.parseDouble(value));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Error parsing map: " + e.getMessage());
+        }
+        return result;
+    }
+    
+    /**
+     * Records the start of a test execution
+     */
+    public void recordTestStart(String testId, String testName, Map<String, String> metadata) {
+        if (!enabled) return;
+        
+        try {
+            // Create or retrieve test step list for this test
+            List<TestStepData> steps = currentSession.computeIfAbsent(testId, k -> new ArrayList<>());
+            
+            // Create test step data for the test start
+            TestStepData startStep = new TestStepData();
+            startStep.setTestId(testId);
+            startStep.setTestName(testName);
+            startStep.setStepType("START");
+            startStep.setTimestamp(System.currentTimeMillis());
+            startStep.setMetadata(metadata != null ? new HashMap<>(metadata) : new HashMap<>());
+            
+            // Add to the steps list
+            steps.add(startStep);
+            
+            logger.debug("Recorded test start: " + testId);
+        } catch (Exception e) {
+            logger.debug("Error recording test start: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Records a test step execution
+     */
+    public void recordTestStep(String testId, String stepName, String stepType, 
+                              boolean stepPassed, long durationMs, Map<String, String> metadata) {
+        if (!enabled) return;
+        
+        try {
+            // Create or retrieve test step list for this test
+            List<TestStepData> steps = currentSession.computeIfAbsent(testId, k -> new ArrayList<>());
+            
+            // Create test step data
+            TestStepData stepData = new TestStepData();
+            stepData.setTestId(testId);
+            stepData.setStepName(stepName);
+            stepData.setStepType(stepType);
+            stepData.setPassed(stepPassed);
+            stepData.setDuration(durationMs);
+            stepData.setTimestamp(System.currentTimeMillis());
+            stepData.setMetadata(metadata != null ? new HashMap<>(metadata) : new HashMap<>());
+            
+            // Add to the steps list
+            steps.add(stepData);
+            
+            logger.debug("Recorded test step: " + testId + " / " + stepName);
+        } catch (Exception e) {
+            logger.debug("Error recording test step: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Records the end of a test execution
+     */
+    public void recordTestEnd(String testId, boolean passed, long durationMs, 
+                             Map<String, Double> coverage, Map<String, String> metadata) {
+        if (!enabled) return;
+        
+        try {
+            // Create test execution data
+            TestExecutionData execData = new TestExecutionData();
+            execData.setTestId(testId);
+            execData.setExecutionTime(System.currentTimeMillis());
+            execData.setResult(passed ? "PASS" : "FAIL");
+            execData.setDuration(durationMs);
+            
+            // Get steps for this test
+            List<TestStepData> steps = currentSession.get(testId);
+            if (steps != null) {
+                // Calculate complexity based on steps
+                execData.setComplexityScore(calculateComplexity(steps));
+                
+                // Calculate resource usage
+                execData.setResourceUsage(calculateResourceUsage(steps));
+                
+                // Extract dependencies
+                execData.setDependencies(extractDependencies(steps));
+            }
+            
+            // Set coverage data
+            if (coverage != null) {
+                execData.setCoverage(new HashMap<>(coverage));
+            }
+            
+            // Set flakiness score based on history
+            execData.setFlakiness(calculateFlakiness(testId, passed));
+            
+            // Store execution data
+            storeTestExecutionData(execData);
+            
+            // Update in-memory history
+            testHistory.put(testId, execData);
+            
+            // Clean up session data
+            currentSession.remove(testId);
+            
+            // Log to report
+            report.logInfo("Test completed: " + testId + ", passed: " + passed + ", duration: " + durationMs + "ms");
+            logger.info("Recorded test end: " + testId + ", passed: " + passed + ", duration: " + durationMs + "ms");
+            
+            // Check if we need to update model
+            checkAndUpdateModel();
+        } catch (Exception e) {
+            logger.error("Error recording test end: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Stores test execution data to a file
+     */
+    private void storeTestExecutionData(TestExecutionData data) throws Exception {
+        storeToFile(data);
+    }
+    
+    /**
+     * Stores test execution data to file
+     */
+    private void storeToFile(TestExecutionData data) throws Exception {
+        // Create filename based on test ID and timestamp
+        String filename = CSSmartCryptoUtils.sha256Hash(data.getTestId()) + "_" + 
+                          data.getExecutionTime() + ".json";
+        
+        Path filePath = Paths.get(dataStoragePath, filename);
+        
+        // Convert data to JSON
+        String json = convertToJson(data);
+        
+        // Write to file
+        Files.write(filePath, json.getBytes());
+    }
+    
+    /**
+     * Converts test execution data to JSON string
+     */
+    private String convertToJson(TestExecutionData data) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        json.append("\"testId\":\"").append(data.getTestId()).append("\",");
+        json.append("\"executionTime\":").append(data.getExecutionTime()).append(",");
+        json.append("\"result\":\"").append(data.getResult()).append("\",");
+        json.append("\"duration\":").append(data.getDuration()).append(",");
+        json.append("\"resourceUsage\":").append(data.getResourceUsage()).append(",");
+        json.append("\"complexityScore\":").append(data.getComplexityScore()).append(",");
+        
+        // Add dependencies
+        json.append("\"dependencies\":").append(convertListToJson(data.getDependencies())).append(",");
+        
+        // Add coverage
+        json.append("\"coverage\":").append(convertMapToJson(data.getCoverage())).append(",");
+        
+        json.append("\"flakiness\":").append(data.getFlakiness());
+        
+        json.append("}");
+        return json.toString();
+    }
+    
+    /**
+     * Converts a list to JSON array
+     */
+    private String convertListToJson(List<String> list) {
+        if (list == null || list.isEmpty()) {
+            return "[]";
+        }
+        
+        StringBuilder json = new StringBuilder();
+        json.append("[");
+        
+        boolean first = true;
+        for (String item : list) {
+            if (!first) {
+                json.append(",");
+            }
+            json.append("\"").append(item).append("\"");
+            first = false;
+        }
+        
+        json.append("]");
+        return json.toString();
+    }
+    
+    /**
+     * Converts a map to JSON object
+     */
+    private String convertMapToJson(Map<String, Double> map) {
+        if (map == null || map.isEmpty()) {
+            return "{}";
+        }
+        
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        boolean first = true;
+        for (Map.Entry<String, Double> entry : map.entrySet()) {
+            if (!first) {
+                json.append(",");
+            }
+            json.append("\"").append(entry.getKey()).append("\":")
+                .append(entry.getValue());
+            first = false;
+        }
+        
+        json.append("}");
+        return json.toString();
+    }
+    
+    /**
+     * Calculates test complexity score based on test steps
+     */
+    private double calculateComplexity(List<TestStepData> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Count different types of actions
+        int validationCount = 0;
+        int interactionCount = 0;
+        int navigationCount = 0;
+        int dataOperationCount = 0;
+        
+        for (TestStepData step : steps) {
+            String type = step.getStepType();
+            if (type == null) continue;
+            
+            switch (type.toUpperCase()) {
+                case "ASSERT":
+                case "VERIFY":
+                case "VALIDATE":
+                    validationCount++;
+                    break;
+                case "CLICK":
+                case "TYPE":
+                case "SELECT":
+                case "DRAG":
+                    interactionCount++;
+                    break;
+                case "NAVIGATE":
+                case "REDIRECT":
+                    navigationCount++;
+                    break;
+                case "DATA":
+                case "API":
+                case "DB":
+                    dataOperationCount++;
+                    break;
+            }
+        }
+        
+        // Calculate complexity score
+        // More interactive steps and validations = higher complexity
+        double baseComplexity = 0.1 * steps.size();
+        double interactionComplexity = 0.2 * interactionCount;
+        double validationComplexity = 0.3 * validationCount;
+        double navigationComplexity = 0.2 * navigationCount;
+        double dataComplexity = 0.4 * dataOperationCount;
+        
+        return baseComplexity + interactionComplexity + validationComplexity + 
+               navigationComplexity + dataComplexity;
+    }
+    
+    /**
+     * Calculates resource usage based on test steps
+     */
+    private double calculateResourceUsage(List<TestStepData> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Sum up durations and check for resource-intensive operations
+        long totalDuration = 0;
+        int resourceIntensiveOps = 0;
+        
+        for (TestStepData step : steps) {
+            totalDuration += step.getDuration();
+            
+            // Check for resource-intensive operations in metadata
+            Map<String, String> metadata = step.getMetadata();
+            if (metadata != null) {
+                if ("true".equalsIgnoreCase(metadata.get("memoryIntensive")) ||
+                    "true".equalsIgnoreCase(metadata.get("cpuIntensive")) ||
+                    "true".equalsIgnoreCase(metadata.get("ioIntensive"))) {
+                    resourceIntensiveOps++;
+                }
+            }
+        }
+        
+        // Calculate resource usage score
+        double durationFactor = Math.min(1.0, totalDuration / 10000.0); // Normalize to 0-1
+        double intensiveOpsFactor = Math.min(1.0, resourceIntensiveOps / 5.0); // Normalize to 0-1
+        
+        return (durationFactor * 0.7) + (intensiveOpsFactor * 0.3);
+    }
+    
+    /**
+     * Extracts test dependencies from test steps
+     */
+    private List<String> extractDependencies(List<TestStepData> steps) {
+        Set<String> dependencies = new HashSet<>();
+        
+        if (steps != null) {
+            for (TestStepData step : steps) {
+                Map<String, String> metadata = step.getMetadata();
+                if (metadata != null) {
+                    String deps = metadata.get("dependencies");
+                    if (deps != null && !deps.isEmpty()) {
+                        // Split comma-separated dependencies
+                        String[] depsArray = deps.split(",");
+                        for (String dep : depsArray) {
+                            dependencies.add(dep.trim());
+                        }
+                    }
+                }
+            }
+        }
+        
+        return new ArrayList<>(dependencies);
+    }
+    
+    /**
+     * Calculates flakiness score based on test history
+     */
+    private double calculateFlakiness(String testId, boolean currentPassed) {
+        TestExecutionData previousData = testHistory.get(testId);
+        if (previousData == null) {
+            // No history, baseline flakiness
+            return 0.1;
+        }
+        
+        // Get previous 10 executions if available
+        List<TestExecutionData> recentExecutions = getRecentExecutions(testId, 10);
+        
+        // If we have multiple executions
+        if (recentExecutions.size() > 1) {
+            int passCount = 0;
+            int totalCount = recentExecutions.size();
+            
+            for (TestExecutionData exec : recentExecutions) {
+                if ("PASS".equals(exec.getResult())) {
+                    passCount++;
+                }
+            }
+            
+            // Calculate pass rate
+            double passRate = (double) passCount / totalCount;
+            
+            // Flakiness is higher when the pass rate is closer to 0.5
+            // (most unpredictable) and lower when it's close to 0 or 1
+            double flakiness = 1.0 - (Math.abs(passRate - 0.5) * 2.0);
+            
+            // Adjust based on current result vs previous result
+            if (previousData != null) {
+                boolean previousPassed = "PASS".equals(previousData.getResult());
+                if (previousPassed != currentPassed) {
+                    // Outcome changed, increase flakiness
+                    flakiness += 0.2;
+                }
+            }
+            
+            return Math.min(1.0, Math.max(0.0, flakiness));
+        } else {
+            // Not enough history
+            return 0.1;
+        }
+    }
+    
+    /**
+     * Gets recent test executions
+     */
+    private List<TestExecutionData> getRecentExecutions(String testId, int limit) {
+        // First check in-memory history
+        TestExecutionData data = testHistory.get(testId);
+        List<TestExecutionData> result = new ArrayList<>();
+        
+        if (data != null) {
+            result.add(data);
+        }
+        
+        // Search for files
+        try {
+            Path historyDir = Paths.get(dataStoragePath);
+            if (Files.exists(historyDir)) {
+                // Find files for this test
+                String testIdHash = CSSmartCryptoUtils.sha256Hash(testId);
+                
+                List<Path> matchingFiles = Files.list(historyDir)
+                    .filter(path -> path.toString().contains(testIdHash))
+                    .sorted((p1, p2) -> p2.toString().compareTo(p1.toString())) // Sort desc
+                    .limit(limit - result.size())
+                    .collect(Collectors.toList());
+                
+                for (Path path : matchingFiles) {
+                    String content = new String(Files.readAllBytes(path));
+                    TestExecutionData execData = parseTestExecutionData(content);
+                    if (execData != null) {
+                        result.add(execData);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Error getting recent executions from files", e);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Checks if model update is needed and triggers update if so
+     */
+    private void checkAndUpdateModel() {
+        // Check if enough time has passed since last update
+        if (lastModelTrainingTime == null ||
+            Duration.between(lastModelTrainingTime, Instant.now()).toHours() >= 24) {
+            
+            // Check if we have enough data
+            if (testHistory.size() >= minimumDataPoints) {
+                updateModel();
+            }
+        }
+    }
+    
+    /**
+     * Updates the machine learning model based on historical data
+     */
+    private void updateModel() {
+        try {
+            logger.info("Updating test path analyzer model...");
+            
+            // Record start time
+            long startTime = System.currentTimeMillis();
+            
+            // Optimize feature weights based on historical data
+            optimizeFeatureWeights();
+            
+            // Clear analysis cache since weights changed
+            analysisCache.clear();
+            
+            // Update last training time
+            lastModelTrainingTime = Instant.now();
+            
+            long duration = System.currentTimeMillis() - startTime;
+            logger.info("Model update completed in " + duration + "ms");
+            
+            // Log updated weights
+            logger.info("Updated feature weights: " + featureWeights);
+        } catch (Exception e) {
+            logger.error("Error updating model: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Optimizes feature weights based on historical performance data
+     */
+    private void optimizeFeatureWeights() {
+        // This is a simplified weight optimization algorithm
+        // In a real implementation, this would use more sophisticated ML techniques
+        
+        if (testHistory.size() < minimumDataPoints) {
+            return;
+        }
+        
+        // Calculate success metrics for each feature
+        Map<String, Double> featureCorrelations = new HashMap<>();
+        
+        // Initialize correlations
+        for (String feature : featureWeights.keySet()) {
+            featureCorrelations.put(feature, 0.0);
+        }
+        
+        // Calculate feature correlations with test success
+        calculateFeatureSuccessCorrelations(featureCorrelations);
+        
+        // Adjust weights based on correlations
+        for (Map.Entry<String, Double> entry : featureCorrelations.entrySet()) {
+            String feature = entry.getKey();
+            double correlation = entry.getValue();
+            
+            // Get current weight
+            double currentWeight = featureWeights.get(feature);
+            
+            // Calculate adjustment factor (positive correlation means increase weight)
+            double adjustment = correlation * 0.1; // 10% maximum adjustment
+            
+            // Update weight
+            double newWeight = Math.max(0.1, Math.min(2.0, currentWeight + adjustment));
+            featureWeights.put(feature, newWeight);
+        }
+    }
+    
+    /**
+     * Calculates correlations between features and test success
+     */
+    private void calculateFeatureSuccessCorrelations(Map<String, Double> correlations) {
+        // Collect feature values and success indicators
+        Map<String, List<Double>> featureValues = new HashMap<>();
+        List<Double> successValues = new ArrayList<>();
+        
+        // Initialize feature lists
+        for (String feature : featureWeights.keySet()) {
+            featureValues.put(feature, new ArrayList<>());
+        }
+        
+        // Collect data from history
+        for (TestExecutionData data : testHistory.values()) {
+            // Success is 1.0 for pass, 0.0 for fail
+            double success = "PASS".equals(data.getResult()) ? 1.0 : 0.0;
+            successValues.add(success);
+            
+            // Collect feature values
+            featureValues.get("executionTime").add((double) data.getDuration());
+            featureValues.get("passRate").add(getHistoricalPassRate(data.getTestId()));
+            featureValues.get("complexity").add(data.getComplexityScore());
+            featureValues.get("resourceUsage").add(data.getResourceUsage());
+            featureValues.get("flakiness").add(data.getFlakiness());
+            
+            // Set dummy values for features we don't have direct data for
+            featureValues.get("dataDependency").add((double) data.getDependencies().size());
+            featureValues.get("coverageGain").add(getCoverageGainScore(data));
+            featureValues.get("lastExecutionStatus").add(success); // Using current status as proxy
+            featureValues.get("age").add(0.5); // Neutral value
+            featureValues.get("userPriority").add(0.5); // Neutral value
+        }
+        
+        // Calculate correlation for each feature
+        for (String feature : featureWeights.keySet()) {
+            List<Double> featureData = featureValues.get(feature);
+            if (featureData.size() == successValues.size() && !featureData.isEmpty()) {
+                double correlation = CSSmartStatisticsUtil.calculateCorrelation(
+                    featureData, successValues);
+                correlations.put(feature, correlation);
+            }
+        }
+    }
+    
+    /**
+     * Gets historical pass rate for a test
+     */
+    private double getHistoricalPassRate(String testId) {
+        List<TestExecutionData> history = getRecentExecutions(testId, 10);
+        
+        if (history.isEmpty()) {
+            return 0.5; // Neutral value if no history
+        }
+        
+        int passCount = 0;
+        for (TestExecutionData data : history) {
+            if ("PASS".equals(data.getResult())) {
+                passCount++;
+            }
+        }
+        
+        return (double) passCount / history.size();
+    }
+    
+    /**
+     * Calculates coverage gain score for a test
+     */
+    private double getCoverageGainScore(TestExecutionData data) {
+        Map<String, Double> coverage = data.getCoverage();
+        
+        if (coverage == null || coverage.isEmpty()) {
+            return 0.0;
+        }
+        
+        // Calculate average coverage
+        double sum = 0.0;
+        for (Double value : coverage.values()) {
+            sum += value;
+        }
+        
+        return sum / coverage.size();
+    }
+    
+    /**
+     * Analyzes a test suite and suggests optimal execution order
+     */
+    public PathAnalysisResult analyzeTestPath(List<String> testIds) {
+        if (!enabled || testIds == null || testIds.isEmpty()) {
+            return new PathAnalysisResult(testIds, Collections.emptyMap());
+        }
+        
+        // Generate cache key for this analysis
+        String cacheKey = String.join(":", testIds);
+        
+        // Check if we have a cached result
+        PathAnalysisResult cachedResult = analysisCache.get(cacheKey);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+        
+        try {
+            logger.info("Analyzing optimal test path for " + testIds.size() + " tests");
+            
+            // Record start time
+            long startTime = System.currentTimeMillis();
+            
+            // Calculate scores for each test
+            Map<String, Double> testScores = calculateTestScores(testIds);
+            
+            // Sort tests by score (higher is better)
+            List<String> optimizedOrder = testIds.stream()
+                .sorted((t1, t2) -> Double.compare(testScores.getOrDefault(t2, 0.0), 
+                                                  testScores.getOrDefault(t1, 0.0)))
+                .collect(Collectors.toList());
+            
+            // Create result
+            PathAnalysisResult result = new PathAnalysisResult(optimizedOrder, testScores);
+            
+            // Cache the result
+            analysisCache.put(cacheKey, result);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            logger.info("Test path analysis completed in " + duration + "ms");
+            
+            return result;
+        } catch (Exception e) {
+            logger.error("Error analyzing test path: " + e.getMessage(), e);
+            return new PathAnalysisResult(testIds, Collections.emptyMap());
+        }
+    }
+    
+    /**
+     * Calculates scores for each test based on weighted features
+     */
+    private Map<String, Double> calculateTestScores(List<String> testIds) {
+        Map<String, Double> scores = new HashMap<>();
+        
+        for (String testId : testIds) {
+            double score = calculateTestScore(testId);
+            scores.put(testId, score);
+        }
+        
+        return scores;
+    }
+    
+    /**
+     * Calculates score for a single test based on weighted features
+     */
+    private double calculateTestScore(String testId) {
+        TestExecutionData data = testHistory.get(testId);
+        
+        if (data == null) {
+            // No history - neutral score
+            return 0.5;
+        }
+        
+        double score = 0.0;
+        double totalWeight = 0.0;
+        
+        // Execution time (negative factor - shorter is better)
+        double normalizedTime = Math.min(1.0, data.getDuration() / 30000.0); // Cap at 30 seconds
+        double timeScore = 1.0 - normalizedTime;
+        score += timeScore * featureWeights.get("executionTime");
+        totalWeight += featureWeights.get("executionTime");
+        
+        // Pass rate
+        double passRate = getHistoricalPassRate(testId);
+        score += passRate * featureWeights.get("passRate");
+        totalWeight += featureWeights.get("passRate");
+        
+        // Complexity
+        double normalizedComplexity = Math.min(1.0, data.getComplexityScore() / 10.0); // Cap at 10
+        score += (1.0 - normalizedComplexity) * featureWeights.get("complexity");
+        totalWeight += featureWeights.get("complexity");
+        
+        // Resource usage (negative factor - lower is better)
+        score += (1.0 - data.getResourceUsage()) * featureWeights.get("resourceUsage");
+        totalWeight += featureWeights.get("resourceUsage");
+        
+        // Data dependency (negative factor - fewer dependencies is better)
+        double dependencyScore = Math.max(0.0, 1.0 - (data.getDependencies().size() / 5.0));
+        score += dependencyScore * featureWeights.get("dataDependency");
+        totalWeight += featureWeights.get("dataDependency");
+        
+        // Coverage gain
+        double coverageScore = getCoverageGainScore(data);
+        score += coverageScore * featureWeights.get("coverageGain");
+        totalWeight += featureWeights.get("coverageGain");
+        
+        // Flakiness (negative factor - lower is better)
+        score += (1.0 - data.getFlakiness()) * featureWeights.get("flakiness");
+        totalWeight += featureWeights.get("flakiness");
+        
+        // Last execution status
+        double lastStatusScore = "PASS".equals(data.getResult()) ? 1.0 : 0.0;
+        score += lastStatusScore * featureWeights.get("lastExecutionStatus");
+        totalWeight += featureWeights.get("lastExecutionStatus");
+        
+        // Normalize final score
+        return score / totalWeight;
+    }
+    
+    /**
+     * Gets feature weights
+     */
+    public Map<String, Double> getFeatureWeights() {
+        return new HashMap<>(featureWeights);
+    }
+    
+    /**
+     * Gets test history size
+     */
+    public int getTestHistorySize() {
+        return testHistory.size();
+    }
+    
+    /**
+     * Data class for test execution data
+     */
+    public static class TestExecutionData {
+        private String testId;
+        private long executionTime;
+        private String result;
+        private long duration;
+        private double resourceUsage;
+        private double complexityScore;
+        private List<String> dependencies = new ArrayList<>();
+        private Map<String, Double> coverage = new HashMap<>();
+        private double flakiness;
+        
+        // Getters and setters
+        public String getTestId() { return testId; }
+        public void setTestId(String testId) { this.testId = testId; }
+        
+        public long getExecutionTime() { return executionTime; }
+        public void setExecutionTime(long executionTime) { this.executionTime = executionTime; }
+        
+        public String getResult() { return result; }
+        public void setResult(String result) { this.result = result; }
+        
+        public long getDuration() { return duration; }
+        public void setDuration(long duration) { this.duration = duration; }
+        
+        public double getResourceUsage() { return resourceUsage; }
+        public void setResourceUsage(double resourceUsage) { this.resourceUsage = resourceUsage; }
+        
+        public double getComplexityScore() { return complexityScore; }
+        public void setComplexityScore(double complexityScore) { this.complexityScore = complexityScore; }
+        
+        public List<String> getDependencies() { return dependencies; }
+        public void setDependencies(List<String> dependencies) { 
+            this.dependencies = dependencies != null ? dependencies : new ArrayList<>(); 
+        }
+        
+        public Map<String, Double> getCoverage() { return coverage; }
+        public void setCoverage(Map<String, Double> coverage) { 
+            this.coverage = coverage != null ? coverage : new HashMap<>(); 
+        }
+        
+        public double getFlakiness() { return flakiness; }
+        public void setFlakiness(double flakiness) { this.flakiness = flakiness; }
+    }
+    
+    /**
+     * Data class for test step data
+     */
+    public static class TestStepData {
+        private String testId;
+        private String testName;
+        private String stepName;
+        private String stepType;
+        private boolean passed;
+        private long duration;
+        private long timestamp;
+        private Map<String, String> metadata = new HashMap<>();
+        
+        // Getters and setters
+        public String getTestId() { return testId; }
+        public void setTestId(String testId) { this.testId = testId; }
+        
+        public String getTestName() { return testName; }
+        public void setTestName(String testName) { this.testName = testName; }
+        
+        public String getStepName() { return stepName; }
+        public void setStepName(String stepName) { this.stepName = stepName; }
+        
+        public String getStepType() { return stepType; }
+        public void setStepType(String stepType) { this.stepType = stepType; }
+        
+        public boolean isPassed() { return passed; }
+        public void setPassed(boolean passed) { this.passed = passed; }
+        
+        public long getDuration() { return duration; }
+        public void setDuration(long duration) { this.duration = duration; }
+        
+        public long getTimestamp() { return timestamp; }
+        public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+        
+        public Map<String, String> getMetadata() { return metadata; }
+        public void setMetadata(Map<String, String> metadata) { 
+            this.metadata = metadata != null ? metadata : new HashMap<>(); 
+        }
+    }
+    
+    /**
+     * Data class for path analysis result
+     */
+    public static class PathAnalysisResult {
+        private final List<String> optimizedOrder;
+        private final Map<String, Double> testScores;
+        
+        public PathAnalysisResult(List<String> optimizedOrder, Map<String, Double> testScores) {
+            this.optimizedOrder = optimizedOrder;
+            this.testScores = testScores;
+        }
+        
+        public List<String> getOptimizedOrder() {
+            return optimizedOrder;
+        }
+        
+        public Map<String, Double> getTestScores() {
+            return testScores;
+        }
+    }
+}
