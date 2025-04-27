@@ -5380,3 +5380,233 @@ public class CSSmartYAMLReader implements CSSmartDataProvider.DataSource {
 }
 
 
+
+
+/**
+ * CSSmartAnnotationProcessor.java
+ * Central annotation processing
+ */
+package com.cssmart.annotations;
+
+import com.cssmart.ado.CSSmartADOIntegration;
+import com.cssmart.config.CSSmartConfig;
+import com.cssmart.data.CSSmartDataProviderRegistry;
+import com.cssmart.driver.CSSmartDriver;
+import com.cssmart.exceptions.CSSmartException;
+import com.cssmart.framework.annotation.CSSmartDataProvider;
+import com.cssmart.framework.annotation.DataSourceType;
+import com.cssmart.logging.CSSmartLogger;
+import com.cssmart.reporting.CSSmartReport;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+
+public class CSSmartAnnotationProcessor {
+    private static final CSSmartLogger logger = CSSmartLogger.getLogger(CSSmartAnnotationProcessor.class);
+    private static final CSSmartReport report = CSSmartReport.getInstance();
+    private static final CSSmartConfig config = CSSmartConfig.getInstance();
+    
+    /**
+     * Process annotations on a test class
+     * @param testClass the test class
+     */
+    public void processClassAnnotations(Class<?> testClass) {
+        logger.debug("Processing annotations for class: " + testClass.getName());
+        
+        // Process CSSmartDataProvider annotation
+        CSSmartDataProvider dataProviderAnnotation = testClass.getAnnotation(CSSmartDataProvider.class);
+        if (dataProviderAnnotation != null) {
+            processDataProviderAnnotation(dataProviderAnnotation, null);
+        }
+        
+        // Process CSSmartADOTest annotation
+        CSSmartADOTest adoTestAnnotation = testClass.getAnnotation(CSSmartADOTest.class);
+        if (adoTestAnnotation != null) {
+            processADOTestAnnotation(adoTestAnnotation, null);
+        }
+    }
+    
+    /**
+     * Process annotations on a test method
+     * @param testMethod the test method
+     * @param testInstance the test instance
+     * @param testDriver the CSSmartDriver instance
+     */
+    public void processMethodAnnotations(Method testMethod, Object testInstance, CSSmartDriver testDriver) {
+        logger.debug("Processing annotations for method: " + testMethod.getName());
+        
+        // Process CSSmartDataProvider annotation
+        CSSmartDataProvider dataProviderAnnotation = testMethod.getAnnotation(CSSmartDataProvider.class);
+        if (dataProviderAnnotation != null) {
+            processDataProviderAnnotation(dataProviderAnnotation, testMethod);
+        }
+        
+        // Process CSSmartADOTest annotation
+        CSSmartADOTest adoTestAnnotation = testMethod.getAnnotation(CSSmartADOTest.class);
+        if (adoTestAnnotation != null) {
+            processADOTestAnnotation(adoTestAnnotation, testMethod);
+        }
+    }
+    
+    /**
+     * Process CSSmartTestStep annotations in a test class
+     * @param testClass the test class
+     * @return an ordered list of methods with CSSmartTestStep annotations
+     */
+    public List<Method> processTestStepAnnotations(Class<?> testClass) {
+        logger.debug("Processing test step annotations for class: " + testClass.getName());
+        
+        // Get all methods with CSSmartTestStep annotation
+        List<Method> stepMethods = new ArrayList<>();
+        
+        for (Method method : testClass.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(CSSmartTestStep.class)) {
+                stepMethods.add(method);
+            }
+        }
+        
+        // Sort by order
+        stepMethods.sort(Comparator.comparingInt(method -> 
+            method.getAnnotation(CSSmartTestStep.class).order()));
+        
+        return stepMethods;
+    }
+    
+    /**
+     * Execute a test step method
+     * @param method the method to execute
+     * @param testInstance the test instance
+     * @param testDriver the CSSmartDriver instance
+     * @param args the method arguments
+     * @return the result of the method invocation
+     */
+    public Object executeTestStep(Method method, Object testInstance, CSSmartDriver testDriver, Object... args) {
+        CSSmartTestStep annotation = method.getAnnotation(CSSmartTestStep.class);
+        if (annotation == null) {
+            throw new CSSmartException("Method does not have CSSmartTestStep annotation: " + method.getName());
+        }
+        
+        String description = annotation.description();
+        boolean takeScreenshot = annotation.takeScreenshot();
+        CSSmartTestStep.Importance importance = annotation.importance();
+        
+        logger.info("Executing test step: " + description);
+        report.logInfo("Executing test step: " + description);
+        
+        try {
+            method.setAccessible(true);
+            Object result = method.invoke(testInstance, args);
+            
+            if (takeScreenshot && testDriver != null) {
+                String screenshotName = method.getName() + "_" + System.currentTimeMillis();
+                testDriver.takeScreenshot(screenshotName);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            report.logError("Test step failed: " + description);
+            throw new CSSmartException("Test step execution failed: " + description, e);
+        }
+    }
+    
+    /**
+     * Process CSSmartDataProvider annotation
+     * @param annotation the annotation
+     * @param method the method (null for class-level annotation)
+     */
+    private void processDataProviderAnnotation(CSSmartDataProvider annotation, Method method) {
+        CSSmartDataProviderRegistry registry = CSSmartDataProviderRegistry.getInstance();
+        
+        try {
+            String path = annotation.path();
+            DataSourceType type = annotation.type();
+            
+            switch (type) {
+                case EXCEL:
+                    // Extract sheet name from path if needed
+                    String sheet = "Sheet1"; // Default sheet name
+                    if (path.contains("#")) {
+                        String[] parts = path.split("#", 2);
+                        path = parts[0];
+                        sheet = parts[1];
+                    }
+                    registry.registerExcelDataProvider(method, path, sheet);
+                    break;
+                    
+                case CSV:
+                    registry.registerCSVDataProvider(method, path);
+                    break;
+                    
+                case JSON:
+                    // For JSON, we'll use default JSONPath if not in the path
+                    String jsonPath = "$"; // Default JSONPath
+                    if (path.contains("#")) {
+                        String[] parts = path.split("#", 2);
+                        path = parts[0];
+                        jsonPath = parts[1];
+                    }
+                    registry.registerJSONDataProvider(method, path, jsonPath);
+                    break;
+                    
+                case DATABASE:
+                    // For database, we'll use the path field to hold the query
+                    registry.registerDBDataProvider(method, path);
+                    break;
+                    
+                case SMART_GENERATION:
+                    // Handle AI-generated test data
+                    registry.registerSmartDataProvider(method, annotation.targetForm(), 
+                        annotation.coverage(), annotation.constraints());
+                    break;
+                    
+                default:
+                    throw new CSSmartException("Unsupported data provider type: " + type);
+            }
+            
+            logger.info("Registered data provider for " + (method != null ? "method: " + method.getName() : "class"));
+        } catch (Exception e) {
+            throw new CSSmartException("Failed to process data provider annotation", e);
+        }
+    }
+    
+    /**
+     * Process CSSmartADOTest annotation
+     * @param annotation the annotation
+     * @param method the method (null for class-level annotation)
+     */
+    private void processADOTestAnnotation(CSSmartADOTest annotation, Method method) {
+        // Skip if ADO integration is not enabled
+        if (!config.getBooleanProperty("ado.enabled", false)) {
+            logger.info("ADO integration is disabled, skipping ADO test annotation processing");
+            return;
+        }
+        
+        try {
+            CSSmartADOIntegration adoIntegration = CSSmartADOIntegration.getInstance();
+            
+            // Register test case mapping
+            adoIntegration.registerTestCase(
+                method != null ? method.getName() : "class-level",
+                annotation.testCaseId(),
+                annotation.updateResults(),
+                annotation.uploadScreenshots(),
+                annotation.uploadReport(),
+                annotation.priority(),
+                annotation.description()
+            );
+            
+            logger.info("Registered ADO test case mapping for " + 
+                (method != null ? "method: " + method.getName() : "class") + 
+                " with test case ID: " + annotation.testCaseId());
+        } catch (Exception e) {
+            throw new CSSmartException("Failed to process ADO test annotation", e);
+        }
+    }
+}
+
+
+
